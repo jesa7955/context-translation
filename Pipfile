@@ -1,0 +1,20 @@
+[[source]]
+name = "pypi"
+url = "https://pypi.org/simple"
+verify_ssl = true
+
+[dev-packages]
+coverage = "*"
+flake8 = "*"
+yapf = "*"
+pylint = "*"
+
+[packages]
+Sphinx = "*"
+allennlp = "*"
+transformers = "*"
+luigi = "*"
+gokart = "*"
+
+[requires]
+python_version = "3.7"
