@@ -21,7 +21,7 @@ local create_dataset_reader(sample_proportion) = {
    "dataset_reader": create_dataset_reader(0.01),
    "validation_dataset_reader": create_dataset_reader(1.0),
    "iterator": {
-      "batch_size": 90,
+      "batch_size": 64,
       "sorting_keys": [
          [
             "tokens",
@@ -42,6 +42,7 @@ local create_dataset_reader(sample_proportion) = {
    "train_data_path": "/data/10/litong/opensubtitles-v2016-en-fr/train/",
    "validation_data_path": "/data/10/litong/opensubtitles-v2016-en-fr/dev/",
    "trainer": {
+      // "type": "callback",
       "cuda_device": [0, 3],
       "grad_norm": 10,
       "num_epochs": 3,
@@ -57,5 +58,8 @@ local create_dataset_reader(sample_proportion) = {
       },
       "patience": 5,
       "validation_metric": "+accuracy"
+      // "callbacks": [
+      //     {"type": "log_to_tensorboard", "log_batch_size_period": 10}
+      // ]
    },
 }
