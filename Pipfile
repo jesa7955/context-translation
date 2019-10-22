@@ -8,13 +8,15 @@ coverage = "*"
 flake8 = "*"
 yapf = "*"
 pylint = "*"
+python-language-server = "*"
 
 [packages]
 Sphinx = "*"
-allennlp = "*"
+allennlp = {git = "https://github.com/allenai/allennlp.git"}
 transformers = "*"
 luigi = "*"
 gokart = "*"
+opustools-pkg = "*"
 
 [requires]
 python_version = "3.7"
