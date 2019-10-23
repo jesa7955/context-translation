@@ -50,6 +50,10 @@ Project Organization
         └── visualization  <- Scripts to create exploratory and results oriented visualizations
             └── visualize.py
 
+Make jiji dataset
+```
+    python main.py context_nmt.GenerateJijiDataSplits --local-scheduler --jiji-source-path /home/litong/jiji-parallel-corpus-v1/ --target-path /data/10/litong/jiji-with-document-boundaries --dev-proportion 0.01 --test-proportion 0.01
+```
 --------
 
 <p><small>Project based on the <a target="_blank" href="https://drivendata.github.io/cookiecutter-data-science/">cookiecutter data science project template</a>. #cookiecutterdatascience</small></p>

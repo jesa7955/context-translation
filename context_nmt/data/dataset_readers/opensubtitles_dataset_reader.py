@@ -1,42 +1,25 @@
+from collections import defaultdict
 import glob
 import os
 import logging
-import itertools
+from typing import Dict
 from overrides import overrides
-from typing import List, Dict, Tuple, Any
 
 import numpy as np
 from allennlp.common.checks import ConfigurationError
 from allennlp.common.file_utils import cached_path
 from allennlp.data.dataset_readers.dataset_reader import DatasetReader
-from allennlp.data.fields import LabelField, TextField, Field, ArrayField, MetadataField
-from allennlp.data import Token, Instance
-from allennlp.data.token_indexers import TokenIndexer, SingleIdTokenIndexer
-from allennlp.data.tokenizers import Tokenizer, SpacyTokenizer
-from allennlp.data.tokenizers.sentence_splitter import SpacySentenceSplitter
-from allennlp.common.util import START_SYMBOL, END_SYMBOL
+from allennlp.data.token_indexers import TokenIndexer
+from allennlp.data.tokenizers import Tokenizer
 
 from context_nmt.data.dataset_readers.context_translation_dataset_reader import (
     ContextTranslationDatasetReader)
-
-CONCAT_SYMBOL = '@concat@'
-SEP_SYMBOL = '[SEP]'
-CLS_SYMBOL = '[CLS]'
 
 logger = logging.getLogger(__name__)
 
 
 @DatasetReader.register("opensubtitles_dataset_reader")
 class OpensubtitlesDatasetReader(ContextTranslationDatasetReader):
-    """
-    Read a bitext file with document boundary and create sentences pairs.
-    SentA should be the so-called context sentence and SentB should be the
-    sentence we care about
-
-    Parameters
-    ----------
-
-    """
     def __init__(self,
                  window_size: int = 6,
                  context_size: int = 3,
@@ -55,12 +38,23 @@ class OpensubtitlesDatasetReader(ContextTranslationDatasetReader):
                  use_target_context: bool = True,
                  source_add_start_token: bool = True,
                  lazy: bool = False) -> None:
-        super().__init__(window_size, context_size, source_only, quality_aware,
-                         score_threhold, sample_proportion, source_lang,
-                         target_lang, source_tokenizer, target_tokenizer,
-                         source_token_indexers, max_sequence_length,
-                         concat_context, use_source_context,
-                         use_target_context, source_add_start_token, lazy)
+        super().__init__(window_size=window_size,
+                         context_size=context_size,
+                         source_only=source_only,
+                         quality_aware=quality_aware,
+                         score_threhold=score_threhold,
+                         source_lang=source_lang,
+                         target_lang=target_lang,
+                         source_tokenizer=source_tokenizer,
+                         target_tokenizer=target_tokenizer,
+                         source_token_indexers=source_token_indexers,
+                         max_sequence_length=max_sequence_length,
+                         concat_context=concat_context,
+                         use_source_context=use_source_context,
+                         use_target_context=use_target_context,
+                         source_add_start_token=source_add_start_token,
+                         lazy=lazy)
+        self._sample_proportion = sample_proportion
 
     @overrides
     def _read_documents_from_raw_data(self, file_path):
@@ -84,36 +78,24 @@ class OpensubtitlesDatasetReader(ContextTranslationDatasetReader):
         with open(ids_path) as ids_f, open(source_path) as source_f, open(
                 target_path) as target_f:
             documents = []
-            document = {
-                self._source_lang: [],
-                self._target_lang: [],
-                'status': []
-            }
+            document = defaultdict(list)
             for status, source, target in zip(ids_f, source_f, target_f):
                 status = status.split('\t')
                 if len(status) != 5:
                     if not self._source_only or np.random.uniform(
                     ) < self._sample_proportion:
                         documents.append(document)
-                    document = {
-                        self._source_lang: [],
-                        self._target_lang: [],
-                        'status': []
-                    }
+                    document = defaultdict(list)
                 else:
                     _, _, source_indexes, target_indexes, score = status
                     document[self._source_lang].append(source)
                     document[self._target_lang].append(target)
                     document['status'].append(
                         (source_indexes, target_indexes, score))
-
-            if self._source_only:
-                example_nums = sum([
-                    (len(document[self._source_lang]) - self._window_size) *
-                    self._window_size for document in documents
-                ])
-                logger.info(f"We can construct {example_nums} examples", )
-            logger.info(f"There are {len(documents)} documents")
+            # There will remain a document
+            if not self._source_only or np.random.uniform(
+            ) < self._sample_proportion:
+                documents.append(document)
         return documents
 
     @overrides

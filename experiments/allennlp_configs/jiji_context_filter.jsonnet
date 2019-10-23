@@ -1,10 +1,9 @@
-local create_dataset_reader(sample_proportion) = {
-  "type": "opensubtitles_dataset_reader",
-  "window_size": 6,
-  "context_size": 3,
+local create_dataset_reader(ws=6, cs=3) = {
+  "type": "jiji_dataset_reader",
+  "window_size": ws,
+  "context_size": cs,
   "source_only": true,
   "quality_aware": false,
-  "sample_proportion": sample_proportion,
   "source_token_indexers": {
      "bert": {
         "type": "pretrained_transformer",
@@ -18,8 +17,8 @@ local create_dataset_reader(sample_proportion) = {
 
 };
 {
-   "dataset_reader": create_dataset_reader(0.01),
-   "validation_dataset_reader": create_dataset_reader(1.0),
+   "dataset_reader": create_dataset_reader(),
+   // "validation_dataset_reader": create_dataset_reader(-1, 3),
    "iterator": {
       "batch_size": 64,
       "sorting_keys": [
@@ -34,13 +33,9 @@ local create_dataset_reader(sample_proportion) = {
       "type": "pretrained_transformer_for_classification",
       "model_name": "bert-base-uncased"
    },
-   //+----------+-------+-------+
-   //+ Train    +  Dev  +  Test +
-   //+----------+-------+-------+
-   //+ 37244708 + 9983  +  9470 +
-   //+----------+-------+-------+
-   "train_data_path": "/data/10/litong/opensubtitles-v2016-en-fr/train/",
-   "validation_data_path": "/data/10/litong/opensubtitles-v2016-en-fr/dev/",
+   "train_data_path": "/data/10/litong/jiji-with-document-boundaries/train.json",
+   "validataion_data_path": "/data/10/litong/jiji-with-document-boundaries/dev.json",
+   "test_data_path": "/data/10/litong/jiji-with-document-boundaries/test.json",
    "trainer": {
       // "type": "callback",
       "cuda_device": [0, 3],

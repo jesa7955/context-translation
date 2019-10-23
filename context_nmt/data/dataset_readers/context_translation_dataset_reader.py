@@ -1,19 +1,14 @@
-import glob
-import os
 import logging
 import itertools
+from typing import List, Dict
 from overrides import overrides
-from typing import List, Dict, Tuple, Any
 
 import numpy as np
-from allennlp.common.checks import ConfigurationError
-from allennlp.common.file_utils import cached_path
 from allennlp.data.dataset_readers.dataset_reader import DatasetReader
-from allennlp.data.fields import LabelField, TextField, Field, ArrayField, MetadataField
+from allennlp.data.fields import LabelField, TextField, ArrayField
 from allennlp.data import Token, Instance
 from allennlp.data.token_indexers import TokenIndexer, SingleIdTokenIndexer
 from allennlp.data.tokenizers import Tokenizer, SpacyTokenizer
-from allennlp.data.tokenizers.sentence_splitter import SpacySentenceSplitter
 from allennlp.common.util import START_SYMBOL, END_SYMBOL
 
 CONCAT_SYMBOL = '@concat@'
@@ -39,7 +34,6 @@ class ContextTranslationDatasetReader(DatasetReader):
                  source_only: bool = False,
                  quality_aware: bool = False,
                  score_threhold: float = 0.9,
-                 sample_proportion: float = 1.0,
                  source_lang: str = 'en',
                  target_lang: str = 'fr',
                  source_tokenizer: Tokenizer = None,
@@ -57,7 +51,6 @@ class ContextTranslationDatasetReader(DatasetReader):
         self._source_only = source_only
         self._quality_aware = quality_aware
         self._score_threhold = score_threhold
-        self._sample_proportion = sample_proportion
         self._source_lang = source_lang
         self._target_lang = target_lang
         self._source_tokenizer = source_tokenizer or SpacyTokenizer(
@@ -114,6 +107,18 @@ class ContextTranslationDatasetReader(DatasetReader):
     def _read(self, file_path):
         docs = self._read_documents_from_raw_data(file_path)
         parallel_docs = [self._get_parallel_document(doc) for doc in docs]
+        logger.info(f"There are {len(docs)} documents")
+        if self._source_only:
+            example_nums = sum([
+                (len(doc) - self._window_size) * self._window_size
+                for doc in parallel_docs
+            ])
+            logger.info(
+                f"We can construct {example_nums} source only examples", )
+        else:
+            logger.info(
+                f"There are {sum([len(doc) for doc in parallel_docs])} parallel sentences",
+            )
         iterators = [self._generate_instances(doc) for doc in parallel_docs]
         for instance in itertools.chain(*iterators):
             yield instance
@@ -146,32 +151,35 @@ class ContextTranslationDatasetReader(DatasetReader):
             ] + source_tokens + [Token(SEP_SYMBOL)]
             token_type_ids = [0] * (len(source_context_tokens) +
                                     2) + [1] * (len(source_tokens) + 1)
-            fields['tokens'] = TextField(tokens, self._source_token_indexers)
-            fields['token_type_ids'] = ArrayField(np.array(token_type_ids),
-                                                  dtype=np.int)
-            fields['label'] = LabelField(str(label))
+            fields.update({
+                'tokens':
+                TextField(tokens, self._source_token_indexers),
+                'token_tye_ids':
+                ArrayField(np.array(token_type_ids), dtype=np.int),
+                'label':
+                LabelField(str(label))
+            })
         else:
             target_context_tokens = self._target_tokenizer.tokenize(
                 target_context)
             target_tokens = self._target_tokenizer.tokenize(target)
             if self._use_source_context:
                 if self._concat_context:
-                    fields['source'] = TextField(
-                        source_context_tokens + [Token(CONCAT_SYMBOL)] +
-                        source_tokens, self._source_tokenizer)
-                else:
-                    fields['source_context'] = TextField(
-                        source_context_tokens, self._source_token_indexers)
-                    fields['source'] = TextField(source_tokens,
-                                                 self._source_token_indexers)
+                    source_context_tokens = []
+                    source_tokens = source_context_tokens + [
+                        Token(CONCAT_SYMBOL)
+                    ] + source_tokens
             else:
-                fields['source'] = TextField(source_tokens,
-                                             self._source_token_indexers)
+                source_context_tokens = []
             if self._use_target_context:
-                fields['target'] = TextField(
-                    target_context_tokens + [Token(CONCAT_SYMBOL)] +
-                    target_tokens, self._target_token_indexers)
-            else:
-                fields['target'] = TextField(target_tokens,
-                                             self._target_token_indexers)
+                target_tokens = target_context_tokens + [Token(CONCAT_SYMBOL)
+                                                         ] + target_tokens
+            fields.update({
+                'source_context':
+                TextField(source_context_tokens, self._source_token_indexers),
+                'source':
+                TextField(source_tokens, self._source_token_indexers),
+                'target':
+                TextField(target_tokens, self._target_token_indexers)
+            })
         return Instance(fields)
