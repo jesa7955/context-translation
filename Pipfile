@@ -17,6 +17,8 @@ transformers = "*"
 luigi = "*"
 gokart = "*"
 opustools-pkg = "*"
+ginza = {file = "https://github.com/megagonlabs/ginza/releases/download/latest/ginza-latest.tar.gz"}
+sentencepiece = "*"
 
 [requires]
 python_version = "3.7"
