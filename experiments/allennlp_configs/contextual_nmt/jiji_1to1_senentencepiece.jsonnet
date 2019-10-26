@@ -4,9 +4,17 @@
       "context_size": 0,
       "window_size": 0,
       "score_threshold": 0.3,
-      "source_max_sequence_length": 80,
-      "target_max_sequence_length": 80,
-      "quality_aware": true
+      "source_max_sequence_length": 85,
+      "target_max_sequence_length": 85,
+      "quality_aware": true,
+      "source_tokenizer": {
+          "type": "sentencepiece",
+          "model_path": "/data/10/litong/jiji-with-document-boundaries/jiji_sentencepiece_en.model"
+      },
+      "target_tokenizer": {
+          "type": "sentencepiece",
+          "model_path": "/data/10/litong/jiji-with-document-boundaries/jiji_sentencepiece_ja.model"
+      }
    },
    "vocabulary": {
       "tokens_to_add": {
@@ -69,7 +77,7 @@
       }
    },
    "trainer": {
-      "cuda_device": 0,
+      "cuda_device": [2, 3],
       "num_epochs": 100,
       "num_serialized_models_to_keep": 1,
       "optimizer": {
