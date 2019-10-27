@@ -62,12 +62,14 @@
          "decoder_net": {
             "type": "lstm_cell",
             "attention": {
-               "type": "dot_product"
+               "type": "additive",
+               "vector_dim": 500,
+               "matrix_dim": 500
             },
             "decoding_dim": 500,
             "target_embedding_dim": 500,
          },
-         "max_decoding_steps": 50,
+         "max_decoding_steps": 85,
          // "scheduled_sampling_ratio": 0.9,
          "target_embedder": {
             "embedding_dim": 500,
@@ -77,7 +79,7 @@
       }
    },
    "trainer": {
-      "cuda_device": [2, 3],
+      "cuda_device": 2,
       "num_epochs": 100,
       "num_serialized_models_to_keep": 1,
       "optimizer": {

@@ -1,25 +1,30 @@
 {
    "dataset_reader": {
-      "type": "seq2seq",
+      "type": "jiji_dataset_reader",
+      "context_size": 0,
+      "window_size": 0,
+      "score_threshold": 0.3,
+      "source_max_sequence_length": 85,
+      "target_max_sequence_length": 85,
+      "quality_aware": true,
       "source_tokenizer": {
           "type": "sentencepiece",
-          "model_path": "/data/10/litong/europarl-v7/europarl-v7.en.sp.model"
+          "model_path": "/data/10/litong/jiji-with-document-boundaries/jiji_sentencepiece_en.model"
       },
       "target_tokenizer": {
           "type": "sentencepiece",
-          "model_path": "/data/10/litong/europarl-v7/europarl-v7.de.sp.model"
-      },
-      "source_max_tokens": 96,
-      "target_max_tokens": 96 
+          "model_path": "/data/10/litong/jiji-with-document-boundaries/jiji_sentencepiece_ja.model"
+      }
    },
    "vocabulary": {
       "tokens_to_add": {
-         "source_tokens": ["@start@", "@end@"],
-         "target_tokens": ["@start@", "@end@"]
+         "source_tokens": ["@start@", "@end@", "@concat"],
+         "target_tokens": ["@start@", "@end@", "@concat"]
       }
    },
-   "train_data_path": "/data/10/litong/europarl-v7/europarl-v7.de-en.train",
-   "validation_data_path": "/data/10/litong/europarl-v7/europarl-v7.de-en.dev",
+   "train_data_path": "/data/10/litong/jiji-with-document-boundaries/train.json",
+   "validation_data_path": "/data/10/litong/jiji-with-document-boundaries/dev.json",
+   "test_data_path": "/data/10/litong/jiji-with-document-boundaries/test.json",
    "iterator": {
       "batch_size": 64,
       "sorting_keys": [
@@ -31,8 +36,8 @@
       "type": "bucket"
    },
    "model": {
-      "type": "composed_seq2seq",
-      "source_text_embedder": {
+      "type": "simple_seq2seq",
+      "source_embedder": {
          "token_embedders": {
             "tokens": {
                "type": "embedding",
@@ -49,30 +54,19 @@
          "input_size": 500,
          "dropout": 0.1
       },
-      "decoder": {
-         "beam_size": 5,
-         "tensor_based_metric": {
-            "type": "bleu"
-         },
-         "decoder_net": {
-            "type": "lstm_cell",
-            "attention": {
-               "type": "dot_product"
-            },
-            "decoding_dim": 500,
-            "target_embedding_dim": 500,
-         },
-         "max_decoding_steps": 50,
-         // "scheduled_sampling_ratio": 0.9,
-         "target_embedder": {
-            "embedding_dim": 500,
-            "vocab_namespace": "target_tokens"
-         },
-         "target_namespace": "target_tokens"
-      }
+      "max_decoding_steps": 85,
+      "target_namespace": "target_tokens",
+      "target_embedding_dim": 500,
+      "attention": {
+         "type": "additive",
+         "vector_dim": 500,
+         "matrix_dim": 500
+      },
+      "beam_size": 5,
+      "use_bleu": true
    },
    "trainer": {
-      "cuda_device": 3,
+      "cuda_device": 2,
       "num_epochs": 100,
       "num_serialized_models_to_keep": 1,
       "optimizer": {
