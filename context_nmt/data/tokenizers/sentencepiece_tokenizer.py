@@ -1,3 +1,4 @@
+import os
 from typing import List, Optional
 
 from overrides import overrides
@@ -11,7 +12,7 @@ from allennlp.data.tokenizers.tokenizer import Tokenizer
 class SentencepieceTokenizer(Tokenizer):
     def __init__(
         self,
-        model_path: str,
+        model_path: str = "",
         start_tokens: Optional[List[str]] = None,
         end_tokens: Optional[List[str]] = None,
         subword_regularization_sample_size: int = 0,
@@ -25,7 +26,15 @@ class SentencepieceTokenizer(Tokenizer):
         self._subword_regularization_sample_size = subword_regularization_sample_size
         self._subword_regularization_alpha = subword_regularization_alpha
         self._processor = spm.SentencePieceProcessor()
-        self._processor.load(model_path)
+        self.load(model_path)
+
+    def load(self, model_path: str):
+        self._model_path = model_path
+        if os.path.exists(model_path):
+            self._processor.load(model_path)
+
+    def model_path_setted(self):
+        return self._model_path != ""
 
     @overrides
     def tokenize(self, text: str) -> List[Token]:

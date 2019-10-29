@@ -1,19 +1,27 @@
 import logging
 import itertools
+import tempfile
+import os
 from typing import List, Dict
 from overrides import overrides
 
 import numpy as np
+import sentencepiece as spm
 from allennlp.data.dataset_readers.dataset_reader import DatasetReader
 from allennlp.data.fields import LabelField, TextField, ArrayField
 from allennlp.data import Token, Instance
 from allennlp.data.token_indexers import TokenIndexer, SingleIdTokenIndexer
-from allennlp.data.tokenizers import Tokenizer, SpacyTokenizer
+from allennlp.data.tokenizers import Tokenizer
 from allennlp.common.util import START_SYMBOL, END_SYMBOL
+from allennlp.data.vocabulary import DEFAULT_OOV_TOKEN
+
+from context_nmt.data.tokenizers.sentencepiece_tokenizer import SentencepieceTokenizer
 
 CONCAT_SYMBOL = "@concat@"
 SEP_SYMBOL = "[SEP]"
 CLS_SYMBOL = "[CLS]"
+
+SPECIAL_CHARACTER_COVERAGES_LANG = set(["ja", "zh", "kr"])
 
 logger = logging.getLogger(__name__)
 
@@ -37,8 +45,11 @@ class ContextTranslationDatasetReader(DatasetReader):
         quality_aware: bool = False,
         source_lang: str = "en",
         target_lang: str = "fr",
+        source_vocabulary_size: int = 16000,
+        target_vocabulary_size: int = 16000,
         source_tokenizer: Tokenizer = None,
         target_tokenizer: Tokenizer = None,
+        normalization_rule_name: str = "nmt_nfkc_cf",
         source_token_indexers: Dict[str, TokenIndexer] = None,
         source_max_sequence_length: int = 512,
         target_max_sequence_length: int = 512,
@@ -54,19 +65,11 @@ class ContextTranslationDatasetReader(DatasetReader):
         self._quality_aware = quality_aware
         self._source_lang = source_lang
         self._target_lang = target_lang
-        spacy_source_name = (
-            f"{source_lang}_core_web_sm" if source_lang != "ja" else "ja_ginza"
-        )
-        spacy_target_name = (
-            f"{source_lang}_core_web_sm" if target_lang != "ja" else "ja_ginza"
-        )
-        self._source_tokenizer = source_tokenizer or SpacyTokenizer(spacy_source_name)
-        if not source_only:
-            self._target_tokenizer = (
-                target_tokenizer
-                if target_tokenizer
-                else SpacyTokenizer(spacy_target_name)
-            )
+        self._source_vocabulary_size = source_vocabulary_size
+        self._target_vocabulary_size = target_vocabulary_size
+        self._source_tokenizer = source_tokenizer or SentencepieceTokenizer()
+        self._target_tokenizer = target_tokenizer or SentencepieceTokenizer()
+        self._normalization_rule_name = normalization_rule_name
         self._source_max_sequence_length = source_max_sequence_length
         self._target_max_sequence_length = target_max_sequence_length
         self._concat_source_context = concat_source_context
@@ -101,6 +104,39 @@ class ContextTranslationDatasetReader(DatasetReader):
 
     def _get_parallel_document(self, document):
         raise NotImplementedError()
+
+    def _train_sentencepiece_from_list(self, sentences) -> None:
+        def train_sentencepiece_from_file(train_data, vocab_size, lang, tokenizer):
+            if any([lang in target for target in SPECIAL_CHARACTER_COVERAGES_LANG]):
+                character_coverage = 0.9995
+            else:
+                character_coverage = 1.0
+            with tempfile.NamedTemporaryFile(
+                mode="w", prefix=f"sentencepiece_model_{lang}_", suffix=".vocab"
+            ) as vocab_file:
+                model_prefix = os.path.splitext(vocab_file.name)[0]
+                spm.SentencePieceTrainer.train(
+                    f"--bos_id=-1 --eos_id=-1 "
+                    f"--user_defined_symbols={START_SYMBOL},{END_SYMBOL},{DEFAULT_OOV_TOKEN} "
+                    f"--input={train_data} --model_prefix={model_prefix} "
+                    f"--character_coverage={character_coverage} "
+                    f"--vocab_size={vocab_size} "
+                    f"--normalization_rule_name={self._normalization_rule_name}"
+                )
+                tokenizer.load(f"{model_prefix}.model")
+
+        for lang, (sents, tokenizer) in sentences.items():
+            with tempfile.NamedTemporaryFile(
+                mode="w", prefix=f"sentencepiece_train_{lang}_", suffix=".txt"
+            ) as tmp_f:
+                tmp_f.write("\n".join(sents))
+                tmp_f.flush()
+                train_sentencepiece_from_file(
+                    train_data=tmp_f.name,
+                    vocab_size=self._source_vocabulary_size,
+                    lang=lang,
+                    tokenizer=tokenizer,
+                )
 
     def _generate_instances(self, parallel_document):
         # Generate examples to train context sentence finder
@@ -140,6 +176,26 @@ class ContextTranslationDatasetReader(DatasetReader):
     def _read(self, file_path):
         docs = self._read_documents_from_raw_data(file_path)
         parallel_docs = [self._get_parallel_document(doc) for doc in docs]
+        if not (
+            self._source_tokenizer.model_path_setted()
+            and self._target_tokenizer.model_path_setted()
+        ):
+            sentences = {
+                self._source_lang: (0, self._source_tokenizer),
+                self._target_lang: (1, self._target_tokenizer),
+            }
+            sentences = {
+                lang: (
+                    list(
+                        itertools.chain.from_iterable(
+                            [[pair[index] for pair in doc] for doc in parallel_docs]
+                        )
+                    ),
+                    tokenizer,
+                )
+                for lang, (index, tokenizer) in sentences.items()
+            }
+            self._train_sentencepiece_from_list(sentences)
         logger.info(f"There are {len(docs)} documents")
         if self._source_only:
             example_nums = sum(
@@ -180,7 +236,7 @@ class ContextTranslationDatasetReader(DatasetReader):
         source_context_tokens = self._source_tokenizer.tokenize(source_context)
         source_tokens = self._source_tokenizer.tokenize(source)
         if self._source_only:
-            # PretrianedTransformerTokenizer adds [CLS] and [SEP]
+            # PretrainedTransformerTokenizer adds [CLS] and [SEP]
             source_context_tokens = source_context_tokens[1:-1]
             source_tokens = source_tokens[1:-1]
             _truncate_seq_pair(source_context_tokens, source_tokens)

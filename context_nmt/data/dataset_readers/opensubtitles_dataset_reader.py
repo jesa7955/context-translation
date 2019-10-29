@@ -19,7 +19,7 @@ from context_nmt.data.dataset_readers.context_translation_dataset_reader import 
 logger = logging.getLogger(__name__)
 
 
-@DatasetReader.register("opensubtitles_dataset_reader")
+@DatasetReader.register("opensubtitles")
 class OpensubtitlesDatasetReader(ContextTranslationDatasetReader):
     def __init__(
         self,

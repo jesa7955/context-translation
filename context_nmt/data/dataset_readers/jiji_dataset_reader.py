@@ -18,7 +18,7 @@ from context_nmt.data.dataset_readers.context_translation_dataset_reader import 
 logger = logging.getLogger(__name__)
 
 
-@DatasetReader.register("jiji_dataset_reader")
+@DatasetReader.register("jiji")
 class JijiDatasetReader(ContextTranslationDatasetReader):
     def __init__(
         self,
