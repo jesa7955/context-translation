@@ -1,9 +1,10 @@
 local create_dataset_reader(ws=6, cs=3) = {
-  "type": "jiji_dataset_reader",
+  "type": "jiji",
   "window_size": ws,
   "context_size": cs,
   "source_only": true,
-  "quality_aware": false,
+  "source_max_sequence_length": 512,
+  "target_max_sequence_length": 512,
   "source_token_indexers": {
      "bert": {
         "type": "pretrained_transformer",
@@ -18,9 +19,8 @@ local create_dataset_reader(ws=6, cs=3) = {
 };
 {
    "dataset_reader": create_dataset_reader(),
-   // "validation_dataset_reader": create_dataset_reader(-1, 3),
    "iterator": {
-      "batch_size": 64,
+      "batch_size": 24,
       "sorting_keys": [
          [
             "tokens",
@@ -34,27 +34,22 @@ local create_dataset_reader(ws=6, cs=3) = {
       "model_name": "bert-base-uncased"
    },
    "train_data_path": "/data/10/litong/jiji-with-document-boundaries/train.json",
-   "validataion_data_path": "/data/10/litong/jiji-with-document-boundaries/dev.json",
+   "validation_data_path": "/data/10/litong/jiji-with-document-boundaries/dev.json",
    "test_data_path": "/data/10/litong/jiji-with-document-boundaries/test.json",
    "trainer": {
-      // "type": "callback",
-      "cuda_device": [0, 3],
-      // "grad_norm": 10,
+      "cuda_device": [0, 1, 3],
       "num_epochs": 3,
       "num_serialized_models_to_keep": 1,
       "optimizer": {
          "type": "bert_adam",
-         "lr": 2e-5
+         "lr": 5e-5
       },
       "learning_rate_scheduler": {
           "type": "slanted_triangular",
           "num_epochs": 3,
-          "num_steps_per_epoch": 120000
+          "num_steps_per_epoch": 16000
       },
       "patience": 5,
       "validation_metric": "+accuracy"
-      // "callbacks": [
-      //     {"type": "log_to_tensorboard", "log_batch_size_period": 10}
-      // ]
    },
 }

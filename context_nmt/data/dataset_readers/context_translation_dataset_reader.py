@@ -153,6 +153,8 @@ class ContextTranslationDatasetReader(DatasetReader):
             # a normal sentence level machine translation system
             if self._context_size == 0:
                 instance = self.text_to_instance(0, 0, "", source, "", target)
+                if instance:
+                    yield instance
             # Otherwise, we start to generate sentence pairs
             else:
                 start = window_size + index - 1
@@ -169,16 +171,16 @@ class ContextTranslationDatasetReader(DatasetReader):
                         target_context,
                         target,
                     )
-            if instance:
-                yield instance
+                    if instance:
+                        yield instance
 
     @overrides
     def _read(self, file_path):
         docs = self._read_documents_from_raw_data(file_path)
         parallel_docs = [self._get_parallel_document(doc) for doc in docs]
-        if not (
-            self._source_tokenizer.model_path_setted()
-            and self._target_tokenizer.model_path_setted()
+        if (
+            isinstance(self._source_tokenizer, SentencepieceTokenizer)
+            and not self._source_tokenizer.model_path_setted()
         ):
             sentences = {
                 self._source_lang: (0, self._source_tokenizer),
@@ -260,6 +262,7 @@ class ContextTranslationDatasetReader(DatasetReader):
                     "label": LabelField(str(label)),
                 }
             )
+            return Instance(fields)
         else:
             target_context_tokens = self._target_tokenizer.tokenize(target_context)
             target_tokens = self._target_tokenizer.tokenize(target)
@@ -299,11 +302,10 @@ class ContextTranslationDatasetReader(DatasetReader):
                         ),
                     }
                 )
-        if (
-            len(source_tokens) > self._source_max_sequence_length
-            or len(source_context_tokens) > self._source_max_sequence_length
-            or len(target_tokens) > self._target_max_sequence_length
-        ):
-            return None
-        else:
+            if (
+                len(source_tokens) > self._source_max_sequence_length
+                or len(source_context_tokens) > self._source_max_sequence_length
+                or len(target_tokens) > self._target_max_sequence_length
+            ):
+                return None
             return Instance(fields)

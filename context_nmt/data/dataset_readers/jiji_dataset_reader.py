@@ -107,6 +107,6 @@ class JijiDatasetReader(ContextTranslationDatasetReader):
             score = pair["score"]
             if self._source_only and not self._quality_aware and source:
                 parallel_document.append((source, ""))
-            elif float(score) >= self._score_threshold:
+            elif source and float(score) >= self._score_threshold:
                 parallel_document.append((source, target))
         return parallel_document
