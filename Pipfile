@@ -9,6 +9,7 @@ flake8 = "*"
 yapf = "*"
 pylint = "*"
 python-language-server = "*"
+black = "*"
 
 [packages]
 Sphinx = "*"
@@ -17,8 +18,10 @@ transformers = "*"
 luigi = "*"
 gokart = "*"
 opustools-pkg = "*"
-ginza = {file = "https://github.com/megagonlabs/ginza/releases/download/latest/ginza-latest.tar.gz"}
 sentencepiece = "*"
 
 [requires]
 python_version = "3.7"
+
+[pipenv]
+allow_prereleases = true

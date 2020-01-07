@@ -4,11 +4,13 @@ import logging
 from overrides import overrides
 import torch
 
-from transformers.modeling_auto import AutoModelForSequenceClassification
+from transformers.modeling_auto import AutoModel
 from transformers.configuration_auto import AutoConfig
+from transformers.modeling_bert import BertForNextSentencePrediction
 
 from allennlp.data.vocabulary import Vocabulary
 from allennlp.models.model import Model
+from allennlp.modules.seq2seq_decoders import SeqDecoder
 from allennlp.nn.initializers import InitializerApplicator
 from allennlp.nn import RegularizerApplicator
 from allennlp.training.metrics import CategoricalAccuracy
@@ -16,18 +18,11 @@ from allennlp.training.metrics import CategoricalAccuracy
 logger = logging.getLogger(__name__)
 
 
-@Model.register("pretrained_transformer_for_classification")
-class PretrainedTransformerForClassification(Model):
+@Model.register("context_sentence_filter")
+class ContextSentenceFilter(Model):
     """
-    An AllenNLP Model that runs pretrained BERT,
-    takes the pooled output, and adds a Linear layer on top.
-    If you want an easy way to use BERT for classification, this is it.
-    Note that this is a somewhat non-AllenNLP-ish model architecture,
-    in that it essentially requires you to use the "bert-pretrained"
-    token indexer, rather than configuring whatever indexing scheme you like.
-
-    See `allennlp/tests/fixtures/bert/bert_for_classification.jsonnet`
-    for an example of what your config might look like.
+    Customized version of BERT NSP. Add the capability for using seq2seq
+    as an auxiliary task
 
     Parameters
     ----------
@@ -37,11 +32,18 @@ class PretrainedTransformerForClassification(Model):
         self,
         vocab: Vocabulary,
         model_name: str,
+        num_labels: int,
+        translation_factor: float = 0.0,
+        seq_decoder: SeqDecoder = None,
+        decoding_dim: int = 512,
+        target_embedding_dim: int = 512,
+        load_classifier: bool = False,
+        transformer_trainable: bool = True,
+        classifier_traninable: bool = True,
         dropout: float = 0.0,
-        num_labels: int = 2,
-        index: str = "bert",
+        index: str = "transformer",
         label_namespace: str = "label",
-        trainable: bool = True,
+        initializer: InitializerApplicator = InitializerApplicator(),
         regularizer: Optional[RegularizerApplicator] = None,
     ) -> None:
         super().__init__(vocab, regularizer)
@@ -50,28 +52,44 @@ class PretrainedTransformerForClassification(Model):
             num_labels = vocab.get_vocab_size(namespace=label_namespace)
         config = AutoConfig.from_pretrained(model_name)
         config.num_labels = num_labels
-        config.hidden_dropout_prob = dropout
-        self.transformer_model = AutoModelForSequenceClassification.from_pretrained(
-            model_name, config=config
-        )
-        for param in self.transformer_model.parameters():
-            param.requires_grad = trainable
+        self.transformer = AutoModel.from_pretrained(model_name, config=config)
+        for param in self.transformer.parameters():
+            param.requires_grad = transformer_trainable
+        # Only BERT supports loading classifier layer currently
+        if load_classifier:
+            self.classifier = BertForNextSentencePrediction.from_pretrained(
+                model_name, config=config
+            ).cls
+            for param in self.classifier.parameters():
+                param.requires_grad = classifier_traninable
+        else:
+            classifier = torch.nn.Linear(config.hidden_size, config.num_labels)
+            initializer(classifier)
+            self.classifier = torch.nn.ModuleList(
+                (torch.nn.Dropout(dropout), classifier)
+            )
 
+        # Add a LSTMCell for translation is specified such
         self._accuracy = CategoricalAccuracy()
+        self._loss = torch.nn.CrossEntropyLoss()
         self._index = index
         self._label_namespace = label_namespace
+        self._translation_factor = translation_factor
+        self._seq_decoder = seq_decoder
 
-    def forward(
+    def forward(  # type: ignore
         self,
-        tokens: Dict[str, torch.LongTensor],
-        token_type_ids: torch.LongTensor,
+        source_tokens: Dict[str, torch.LongTensor],
+        target_tokens: Dict[str, torch.LongTensor] = None,
         label: torch.IntTensor = None,
     ) -> Dict[str, torch.Tensor]:
         """
         Parameters
         ----------
-        tokens : Dict[str, torch.LongTensor]
-            From a ``TextField`` (that has a bert-pretrained token indexer)
+        source_tokens : Dict[str, torch.LongTensor]
+            From a ``TextField`` (that has a pretrained transformer (customized) token indexer)
+        target_tokens : Dict[str, torch.LongTensor]
+            From a ``TextField`` (that has a single id indexer)
         label : torch.IntTensor, optional (default = None)
             From a ``LabelField``
 
@@ -88,27 +106,34 @@ class PretrainedTransformerForClassification(Model):
         loss : torch.FloatTensor, optional
             A scalar loss to be optimised.
         """
-        input_ids = tokens[self._index]
+        input_ids = source_tokens[self._index]
+        token_type_ids = source_tokens[f"{self._index}-type-ids"]
         input_mask = (input_ids != 0).long()
 
-        results = self.transformer_model(
+        _, pooled = self.transformer(
             input_ids=input_ids,
             token_type_ids=token_type_ids,
             attention_mask=input_mask,
-            labels=label,
         )
-        loss, logits = None, None
-        results_len = len(results)
-        if results_len in (1, 3):
-            logits = results[0]
-        else:
-            loss, logits = results[0], results[1]
+
+        logits = self.classifier(pooled)
         probs = torch.nn.functional.softmax(logits, dim=-1)
         output_dict = {"logits": logits, "probs": probs}
-        if loss:
-            output_dict["loss"] = loss
+        if label is not None:
+            loss = self._loss(logits, label.long().view(-1))
             self._accuracy(logits, label)
 
+            if self.training and target_tokens:
+                batch_size, bert_dim = pooled.shape()
+                state = {
+                    "source_mask": torch.ones(batch_size, 1),
+                    "encoder_outputs": pooled.view(batch_size, 1, bert_dim),
+                }
+                decoder_loss = self._seq_decoder(state, target_tokens)["loss"]
+                loss = (
+                    1 - self._translation_factor
+                ) * loss + self._translation_factor * decoder_loss
+            output_dict["loss"] = loss
         return output_dict
 
     @overrides

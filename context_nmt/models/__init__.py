@@ -1,3 +1,2 @@
-from context_nmt.models.pretrained_transformer_for_classification import (
-    PretrainedTransformerForClassification,
-)
+from context_nmt.models.context_sentence_filter import ContextSentenceFilter
+from context_nmt.models.decoders.fixed_attention import FixedAttention

@@ -5,6 +5,7 @@ import json
 import os
 import re
 import itertools
+import tqdm
 
 import luigi
 import gokart
@@ -17,7 +18,6 @@ logger = logging.getLogger("luigi-interface")
 class MergeJijiFiles(gokart.TaskOnKart):
     task_namespace = "context_nmt"
     source_path = luigi.Parameter()
-    score_threhold = luigi.FloatParameter()
     quality_aware = luigi.BoolParameter()
     score_threhold = luigi.FloatParameter()
 
@@ -45,15 +45,19 @@ class MergeJijiFiles(gokart.TaskOnKart):
                         en_sent += " " + sentence
                     else:
                         ja_sent += sentence
-                documents[doc_id].append(
-                    {
-                        "sent_id": sent_id,
-                        "en": en_sent.strip(),
-                        "ja": ja_sent,
-                        "score": float(score),
-                    }
-                )
+                if not self.quality_aware or float(score) >= self.score_threhold:
+                    documents[doc_id].append(
+                        {
+                            "sent_id": sent_id,
+                            "en": en_sent.strip(),
+                            "ja": ja_sent,
+                            "score": float(score),
+                        }
+                    )
         logger.info(f"There are {len(documents)} documents")
+        for doc_id, document in tqdm.tqdm(documents.items(), total=len(documents)):
+            with open(f'{doc_id}.json', 'w') as target:
+                json.dump(document, target, indent=2, ensure_ascii=False)
         self.dump(documents)
 
 
