@@ -1,6 +1,5 @@
-//function(cuda_devices=[0, 1]) {
-{
-  //cuda_device: cuda_device,
+function(cuda_device) {
+  cuda_device: cuda_device,
   num_epochs: 1000,
   optimizer: {
     lr: 0.0001,

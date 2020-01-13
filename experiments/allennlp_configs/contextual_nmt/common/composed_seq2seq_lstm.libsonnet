@@ -11,22 +11,28 @@
     },
   },
   encoder: {
-    type: 'lstm',
+    type: 'stacked_lstm',
     num_layers: 2,
     hidden_size: 500,
     input_size: 500,
     dropout: 0.1,
   },
   decoder: {
+    type: 'bleu_auto_regressive_seq_decoder',
+    bleu_exclude_tokens: ['@start@', '@end@', '@concat@'],
     beam_size: 5,
     tensor_based_metric: {
       type: 'bleu',
     },
     decoder_net: {
-      type: 'lstm_cell',
+      type: 'stacked_lstm_cell',
       attention: {
-        type: 'dot_product',
+        type: 'additive',
+        vector_dim: 500,
+        matrix_dim: 500,
       },
+      layer_num: 2,
+      hidden_dim: 500,
       decoding_dim: 500,
       target_embedding_dim: 500,
     },

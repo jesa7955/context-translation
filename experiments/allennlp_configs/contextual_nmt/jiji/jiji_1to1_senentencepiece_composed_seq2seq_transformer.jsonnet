@@ -1,5 +1,5 @@
-local model = import '../common/simple_seq2seq_lstm.libsonnet';
-local create_trainer = import '../common/trainer.libsonnet';
+local model = import '../common/composed_seq2seq_transformer.libsonnet';
+local create_trainer = import '../common/trainer_single.libsonnet';
 local create_configuration = import 'create_configuration.libsonnet';
 local create_dataset_reader = import 'dataset_reader.libsonnet';
 local trans_tokenizer = {
@@ -17,4 +17,4 @@ local ja_tokenizer = {
 local train_dataset_reader = create_dataset_reader('1-to-1', 'none', {}, en_tokenizer, ja_tokenizer);
 local val_dataset_reader = create_dataset_reader('1-to-1', 'none', {}, en_tokenizer, ja_tokenizer);
 
-create_configuration(train_dataset_reader, val_dataset_reader, create_trainer(0), model)
+create_configuration(train_dataset_reader, val_dataset_reader, create_trainer(1), model)

@@ -4,6 +4,7 @@ from typing import List, Optional
 from overrides import overrides
 
 import sentencepiece as spm
+from allennlp.common.util import START_SYMBOL, END_SYMBOL
 from allennlp.data.tokenizers.token import Token
 from allennlp.data.tokenizers.tokenizer import Tokenizer
 
@@ -12,29 +13,22 @@ from allennlp.data.tokenizers.tokenizer import Tokenizer
 class SentencepieceTokenizer(Tokenizer):
     def __init__(
         self,
-        model_path: str = "",
-        start_tokens: Optional[List[str]] = None,
-        end_tokens: Optional[List[str]] = None,
+        model_path: str,
         subword_regularization_sample_size: int = 0,
         subword_regularization_alpha: float = 0.2,
     ) -> None:
-        self._start_tokens = start_tokens or []
-        # We reverse the tokens here because we're going to insert them with `insert(0)` later;
-        # this makes sure they show up in the right order.
-        self._start_tokens.reverse()
-        self._end_tokens = end_tokens or []
         self._subword_regularization_sample_size = subword_regularization_sample_size
         self._subword_regularization_alpha = subword_regularization_alpha
         self._processor = spm.SentencePieceProcessor()
-        self.load(model_path)
+        self.model_path = model_path
+        self.load()
 
-    def load(self, model_path: str):
-        self._model_path = model_path
-        if os.path.exists(model_path):
-            self._processor.load(model_path)
+    def load(self):
+        if os.path.exists(self.model_path):
+            self._processor.load(self.model_path)
 
-    def model_path_setted(self):
-        return self._model_path != ""
+    def model_trained(self):
+        return os.path.exists(self.model_path)
 
     @overrides
     def tokenize(self, text: str) -> List[Token]:
@@ -47,8 +41,4 @@ class SentencepieceTokenizer(Tokenizer):
                 self._subword_regularization_alpha,
             )
         tokens = [Token(token) for token in tokens]
-        for start_token in self._start_tokens:
-            tokens.insert(0, Token(start_token, 0))
-        for end_token in self._end_tokens:
-            tokens.append(Token(end_token, -1))
         return tokens

@@ -28,7 +28,7 @@ class MergeJijiFiles(gokart.TaskOnKart):
         return self.make_target("merged_jiji_splits.pkl")
 
     def run(self):
-        documents = collections.defaultdict(list)
+        documents = collections.defaultdict(lambda: collections.defaultdict(list))
         for file_path in glob.glob(self.source_path + "/*.txt"):
             with open(file_path) as source:
                 bi_texts = re.split(r"^# |\n# ", source.read())[1:]
@@ -39,25 +39,22 @@ class MergeJijiFiles(gokart.TaskOnKart):
                     r"(\d*)_BODY-JE-(\d*) score=(\d\.?\d*)", header
                 )[0]
                 en_sent, ja_sent = "", ""
+                score, sent_id = float(score), int(sent_id)
                 for line in lines[1:]:
                     lang, sentence = line.split(": ", maxsplit=1)
                     if lang[:2] == "en":
                         en_sent += " " + sentence
                     else:
                         ja_sent += sentence
-                if not self.quality_aware or float(score) >= self.score_threhold:
-                    documents[doc_id].append(
-                        {
-                            "sent_id": sent_id,
-                            "en": en_sent.strip(),
-                            "ja": ja_sent,
-                            "score": float(score),
-                        }
-                    )
+                if not self.quality_aware or score >= self.score_threhold:
+                    documents[doc_id]["en"].append(en_sent.strip())
+                    documents[doc_id]["ja"].append(ja_sent)
+                    documents[doc_id]["pairs"].append((sent_id - 1, score))
         logger.info(f"There are {len(documents)} documents")
-        for doc_id, document in tqdm.tqdm(documents.items(), total=len(documents)):
-            with open(f'{doc_id}.json', 'w') as target:
-                json.dump(document, target, indent=2, ensure_ascii=False)
+        documents = dict(documents)
+        # for doc_id, document in tqdm.tqdm(documents.items(), total=len(documents)):
+        #     with open(f"{doc_id}.json", "w") as target:
+        #         json.dump(document, target, indent=2, ensure_ascii=False)
         self.dump(documents)
 
 

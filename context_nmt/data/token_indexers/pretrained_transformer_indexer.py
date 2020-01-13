@@ -13,8 +13,8 @@ from allennlp.data.token_indexers.token_indexer import TokenIndexer
 logger = logging.getLogger(__name__)
 
 
-@TokenIndexer.register("pretrained_transformer")
-class PretrainedTransformerIndexer(TokenIndexer[int]):
+@TokenIndexer.register("pretrained_transformer_customized")
+class PretrainedTransformerIndexerCustomized(TokenIndexer[int]):
     """
     This ``TokenIndexer`` assumes that Tokens already have their indexes in them (see ``text_id`` field).
     We still require ``model_name`` because we want to form allennlp vocabulary from pretrained one.
@@ -34,12 +34,17 @@ class PretrainedTransformerIndexer(TokenIndexer[int]):
     """
 
     def __init__(
-        self, model_name: str, namespace: str = "tags", token_min_padding_length: int = 0
+        self,
+        model_name: str,
+        namespace: str = "tags",
+        token_min_padding_length: int = 0,
     ) -> None:
         super().__init__(token_min_padding_length)
         self._namespace = namespace
         self._tokenizer = AutoTokenizer.from_pretrained(model_name)
-        self._padding_value = self._tokenizer.convert_tokens_to_ids([self._tokenizer.pad_token])[0]
+        self._padding_value = self._tokenizer.convert_tokens_to_ids(
+            [self._tokenizer.pad_token]
+        )[0]
         logger.info(f"Using token indexer padding value of {self._padding_value}")
         self._added_to_vocabulary = False
 
@@ -79,12 +84,14 @@ class PretrainedTransformerIndexer(TokenIndexer[int]):
             self._added_to_vocabulary = True
 
         indices: List[int] = []
+        type_ids: List[int] = []
         for token in tokens:
             if getattr(token, "text_id", None) is not None:
                 # `text_id` being set on the token means that we aren't using the vocab, we just use
                 # this id instead. Id comes from the pretrained vocab.
                 # It is computed in PretrainedTransformerTokenizer.
                 indices.append(token.text_id)
+                type_ids.append(token.type_id)
             else:
                 raise KeyError(
                     "Using PretrainedTransformerIndexer but field text_id is not set"
@@ -95,7 +102,11 @@ class PretrainedTransformerIndexer(TokenIndexer[int]):
         # tokens are attended to.
         attention_mask = [1] * len(indices)
 
-        return {index_name: indices, "mask": attention_mask}
+        return {
+            index_name: indices,
+            f"{index_name}-type-ids": type_ids,
+            "mask": attention_mask,
+        }
 
     @overrides
     def get_padding_lengths(self, token: int) -> Dict[str, int]:
@@ -111,7 +122,9 @@ class PretrainedTransformerIndexer(TokenIndexer[int]):
         return {
             key: torch.LongTensor(
                 pad_sequence_to_length(
-                    val, desired_num_tokens[key], default_value=lambda: self._padding_value
+                    val,
+                    desired_num_tokens[key],
+                    default_value=lambda: self._padding_value,
                 )
             )
             for key, val in tokens.items()

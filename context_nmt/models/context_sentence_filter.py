@@ -1,4 +1,5 @@
-from typing import Dict, Union, Optional
+import collections
+from typing import Dict, Union, Optional, Any
 import logging
 
 from overrides import overrides
@@ -82,6 +83,9 @@ class ContextSentenceFilter(Model):
         source_tokens: Dict[str, torch.LongTensor],
         target_tokens: Dict[str, torch.LongTensor] = None,
         label: torch.IntTensor = None,
+        doc_id: Any = None,
+        sent_id: Any = None,
+        context_sent_id: Any = None,
     ) -> Dict[str, torch.Tensor]:
         """
         Parameters
@@ -124,9 +128,9 @@ class ContextSentenceFilter(Model):
             self._accuracy(logits, label)
 
             if self.training and target_tokens:
-                batch_size, bert_dim = pooled.shape()
+                batch_size, bert_dim = pooled.shape
                 state = {
-                    "source_mask": torch.ones(batch_size, 1),
+                    "source_mask": torch.ones(batch_size, 1, device=pooled.device),
                     "encoder_outputs": pooled.view(batch_size, 1, bert_dim),
                 }
                 decoder_loss = self._seq_decoder(state, target_tokens)["loss"]
@@ -134,6 +138,15 @@ class ContextSentenceFilter(Model):
                     1 - self._translation_factor
                 ) * loss + self._translation_factor * decoder_loss
             output_dict["loss"] = loss
+        else:
+            output_dict["results"] = collections.defaultdict(
+                lambda: collections.defaultdict(list)
+            )
+            for d_id, s_id, cs_id, score in zip(
+                doc_id, sent_id, context_sent_id, probs[:, 1]
+            ):
+                output_dict["results"][d_id][s_id].append((cs_id, score))
+            output_dict["results"] = dict(output_dict["results"])
         return output_dict
 
     @overrides

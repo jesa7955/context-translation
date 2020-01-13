@@ -1,5 +1,5 @@
-local model = import '../common/simple_seq2seq_lstm.libsonnet';
-local create_trainer = import '../common/trainer.libsonnet';
+local model = import '../common/composed_seq2seq_transformer.libsonnet';
+local create_trainer = import '../common/trainer_noam_single.libsonnet';
 local create_configuration = import 'create_configuration.libsonnet';
 local create_dataset_reader = import 'dataset_reader.libsonnet';
 local trans_tokenizer = {

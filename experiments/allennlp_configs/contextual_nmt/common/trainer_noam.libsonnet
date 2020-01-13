@@ -8,9 +8,9 @@
   },
   patience: 10,
   learning_rate_scheduler: {
-    type: 'reduce_on_plateau',
-    factor: 0.7,
-    patience: 8,
+    type: 'noam',
+    model_size: 512,
+    warmup_steps: 8000,
   },
   //learning_rate_scheduler: {
   //  type: 'noam',

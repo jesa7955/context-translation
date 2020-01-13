@@ -1,10 +1,11 @@
-local create_dataset_reader(ws=1, cs=1) = {
+local create_dataset_reader(trans_mode, class_mode) = {
   type: 'jiji',
-  window_size: ws,
-  context_size: cs,
-  source_only: true,
-  source_max_sequence_length: 512,
-  target_max_sequence_length: 512,
+  window_size: 1,
+  context_size: 1,
+  translation_data_mode: trans_mode,
+  classification_data_mode: class_mode,
+  source_max_sequence_length: 85,
+  target_max_sequence_length: 85,
   source_token_indexers: {
     transformer: {
       type: 'pretrained_transformer_customized',
@@ -15,15 +16,19 @@ local create_dataset_reader(ws=1, cs=1) = {
     type: 'pretrained_transformer',
     model_name: 'bert-base-uncased',
   },
-
+  target_tokenizer: {
+    type: 'sentencepiece',
+    model_path: '/data/10/litong/jiji-with-document-boundaries/jiji_sentencepiece_ja.model',
+  },
 };
 {
-  dataset_reader: create_dataset_reader(),
+  dataset_reader: create_dataset_reader("2-to-1", "train"),
+  // validation_dataset_reader: create_dataset_reader("2-to-1", "inference"),
   iterator: {
-    batch_size: 24,
+    batch_size: 128,
     sorting_keys: [
       [
-        'tokens',
+        'source_tokens',
         'num_tokens',
       ],
     ],
@@ -56,10 +61,10 @@ local create_dataset_reader(ws=1, cs=1) = {
   //"train_data_path": "/data/10/litong/jiji-with-document-boundaries/train.json",
   //"validation_data_path": "/data/10/litong/jiji-with-document-boundaries/dev.json",
   //"test_data_path": "/data/10/litong/jiji-with-document-boundaries/test.json",
-  train_data_path: '/data/10/litong/jiji-with-document-boundaries/toy_train.json',
-  validation_data_path: '/data/10/litong/jiji-with-document-boundaries/toy_test.json',
+  train_data_path: '/data/10/litong/jiji-with-document-boundaries/dev.json',
+  validation_data_path: '/data/10/litong/jiji-with-document-boundaries/test.json',
   distributed: {
-    cuda_devices: [0, 1, 2, 3],
+    cuda_devices: [0, 1],
   },
   trainer: {
     num_epochs: 3,
