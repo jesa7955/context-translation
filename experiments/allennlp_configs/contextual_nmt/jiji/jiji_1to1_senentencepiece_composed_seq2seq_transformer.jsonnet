@@ -14,7 +14,17 @@ local ja_tokenizer = {
   type: 'sentencepiece',
   model_path: '/data/10/litong/jiji-with-document-boundaries/jiji_sentencepiece_ja.model',
 };
-local train_dataset_reader = create_dataset_reader('1-to-1', 'none', {}, en_tokenizer, ja_tokenizer);
-local val_dataset_reader = create_dataset_reader('1-to-1', 'none', {}, en_tokenizer, ja_tokenizer);
+local share_tokenizer = {
+  type: 'sentencepiece',
+  model_path: '/data/10/litong/jiji-with-document-boundaries/jiji_sentencepiece_en_ja.model',
+};
+local common_token_indexers = {
+  tokens: {
+    type: 'single_id',
+    namespace: 'tokens',
+  },
+};
+local train_dataset_reader = create_dataset_reader('2-to-1', 'none', share_tokenizer, share_tokenizer, common_token_indexers, common_token_indexers, true);
+local val_dataset_reader = create_dataset_reader('2-to-1', 'none', share_tokenizer, share_tokenizer, common_token_indexers, common_token_indexers, true);
 
 create_configuration(train_dataset_reader, val_dataset_reader, create_trainer(1), model)

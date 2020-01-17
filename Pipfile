@@ -19,6 +19,8 @@ luigi = "*"
 gokart = "*"
 opustools-pkg = "*"
 sentencepiece = "*"
+fairseq = {git = "https://github.com/pytorch/fairseq.git"}
+sacrebleu = "*"
 
 [requires]
 python_version = "3.7"

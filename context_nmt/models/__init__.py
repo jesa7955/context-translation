@@ -16,6 +16,7 @@ from context_nmt.models.decoders.stacked_lstm_cell_decoder_net import (
 from context_nmt.models.encoders.stacked_pytorch_seq2seq_wrapper import (
     StackedPytorchSeq2SeqWrapper,
 )
+from context_nmt.models.factored_composed_seq2seq import FactoredComposedSeq2Seq
 
 
 class _Seq2SeqWrapper:

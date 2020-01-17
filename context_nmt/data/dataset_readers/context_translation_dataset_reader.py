@@ -46,6 +46,7 @@ class ContextTranslationDatasetReader(DatasetReader):
         target_lang: str = "fr",
         source_vocabulary_size: int = 16000,
         target_vocabulary_size: int = 16000,
+        share_vocabulary: bool = False,
         source_tokenizer: Tokenizer = None,
         target_tokenizer: Tokenizer = None,
         normalization_rule_name: str = "nmt_nfkc_cf",
@@ -58,6 +59,8 @@ class ContextTranslationDatasetReader(DatasetReader):
         concat_source_context: bool = True,
         source_add_start_token: bool = False,
         source_add_end_token: bool = False,
+        source_add_factors: bool = False,
+        source_only: bool = False,
         lazy: bool = False,
     ) -> None:
         super().__init__(lazy=lazy)
@@ -67,6 +70,7 @@ class ContextTranslationDatasetReader(DatasetReader):
         self._target_lang = target_lang
         self._source_vocabulary_size = source_vocabulary_size
         self._target_vocabulary_size = target_vocabulary_size
+        self._share_vocabulary = share_vocabulary
         self._source_tokenizer = source_tokenizer or SpacyTokenizer()
         self._target_tokenizer = target_tokenizer or SpacyTokenizer()
         self._normalization_rule_name = normalization_rule_name
@@ -84,16 +88,23 @@ class ContextTranslationDatasetReader(DatasetReader):
         self._concat_source_context = concat_source_context
         self._source_add_start_token = source_add_start_token
         self._source_add_end_token = source_add_end_token
+        self._source_add_factors = source_add_factors
+        self._source_only = source_only
 
         self._source_token_indexers = (
             source_token_indexers
             if source_token_indexers
-            else {"tokens": SingleIdTokenIndexer(namespace="source_tokens",)}
+            else {"tokens": SingleIdTokenIndexer(namespace="source_tokens")}
         )
         self._target_token_indexers = (
             target_token_indexers
             if target_token_indexers
-            else {"tokens": SingleIdTokenIndexer(namespace="target_tokens",)}
+            else {"tokens": SingleIdTokenIndexer(namespace="target_tokens")}
+        )
+        self._source_factor_indexers = (
+            {"factors": SingleIdTokenIndexer(namespace="source_factors")}
+            if source_add_factors
+            else None
         )
 
     def _read_documents_from_raw_data(self, file_path):
@@ -117,9 +128,8 @@ class ContextTranslationDatasetReader(DatasetReader):
                 f"--vocab_size={vocab_size} "
                 f"--normalization_rule_name={self._normalization_rule_name}"
             )
-            tokenizer.load()
 
-        for lang, (sents, tokenizer) in sentences.items():
+        for lang, (sents, tokenizer, vocab_size) in sentences.items():
             with tempfile.NamedTemporaryFile(
                 mode="w", prefix=f"sentencepiece_train_{lang}_", suffix=".txt"
             ) as tmp_f:
@@ -127,7 +137,7 @@ class ContextTranslationDatasetReader(DatasetReader):
                 tmp_f.flush()
                 train_sentencepiece_from_file(
                     train_data=tmp_f.name,
-                    vocab_size=self._source_vocabulary_size,
+                    vocab_size=vocab_size,
                     lang=lang,
                     tokenizer=tokenizer,
                 )
@@ -144,31 +154,46 @@ class ContextTranslationDatasetReader(DatasetReader):
             not self._source_tokenizer.model_trained()
             or not self._target_tokenizer.model_trained()
         ):
-            sentences = {
-                self._source_lang: self._source_tokenizer,
-                self._target_lang: self._target_tokenizer,
-            }
-            sentences = {
-                lang: (
-                    list(
-                        itertools.chain.from_iterable(
-                            [doc[lang] for doc in docs.values()]
-                        )
-                    ),
-                    tokenizer,
+            source_sentence_list, target_sentence_list = [
+                list(
+                    itertools.chain.from_iterable([doc[lang] for doc in docs.values()])
                 )
-                for lang, tokenizer in sentences.items()
-            }
+                for lang in (self._source_lang, self._target_lang)
+            ]
+            if self._share_vocabulary:
+                sentences = {
+                    self._source_lang: (
+                        source_sentence_list,
+                        self._source_tokenizer,
+                        self._source_vocabulary_size,
+                    ),
+                    self._target_lang: (
+                        target_sentence_list,
+                        self._target_tokenizer,
+                        self._target_vocabulary_size,
+                    ),
+                }
+            else:
+                sentences = {
+                    f"{self._source_lang}_{self._target_lang}": (
+                        source_sentence_list + target_sentence_list,
+                        self._source_tokenizer,
+                        self._source_vocabulary_size + self._target_vocabulary_size,
+                    )
+                }
             self._train_sentencepiece_from_list(sentences)
-        logger.info(
-            f"There are {sum([len(doc) for doc in parallel_docs])} parallel sentences"
-        )
+            self._source_tokenizer.load()
+            self._target_tokenizer.load()
         iterators = [
             self._generate_instances(doc_id, parallel_doc, docs)
             for doc_id, parallel_doc in parallel_docs.items()
         ]
         for instance in itertools.chain(*iterators):
-            yield instance
+            if len(instance["source_tokens"]) <= self._source_max_sequence_length and (
+                "target_tokens" not in instance.fields
+                or len(instance["target_tokens"]) <= self._target_max_sequence_length
+            ):
+                yield instance
 
     def _generate_instances(self, doc_id, parallel_document, raw_documents):
         for sent_id in parallel_document:
@@ -272,8 +297,11 @@ class ContextTranslationDatasetReader(DatasetReader):
                                 doc_id,
                                 sent_id,
                                 index,
-                                None,
                             )
+                    # Add a "" to train a model which can also handle 1-to-1
+                    # yield self.text_to_instance(
+                    #     "", source, None, None, doc_id, -1, index, None
+                    # )
 
     @overrides
     def text_to_instance(
@@ -299,7 +327,10 @@ class ContextTranslationDatasetReader(DatasetReader):
         if target_tokens:
             target_tokens.insert(0, Token(START_SYMBOL))
             target_tokens.append(Token(END_SYMBOL))
-        fields["target_tokens"] = TextField(target_tokens, self._target_token_indexers)
+        if not self._source_only:
+            fields["target_tokens"] = TextField(
+                target_tokens, self._target_token_indexers
+            )
         if self._classification_data_mode != "none":
             # PretrainedTransformerTokenizer can add special tokens by self now
             # What we want here is: [CLS] source_context [SEP] source [SEP]
@@ -309,7 +340,8 @@ class ContextTranslationDatasetReader(DatasetReader):
             ):
                 if value is not None:
                     fields[key] = MetadataField(value)
-            fields["label"] = LabelField(str(label))
+            if label:
+                fields["label"] = LabelField(str(label))
             source_tokens = self._source_tokenizer.tokenize_sentence_pair(
                 source_context, source
             )
@@ -327,9 +359,17 @@ class ContextTranslationDatasetReader(DatasetReader):
             )
             if self._translation_data_mode != "1-to-1":
                 if self._concat_source_context:
+                    context_factor, source_factor = Token("C"), Token("S")
+                    source_factors = [context_factor] * (
+                        len(source_context_tokens) + 1
+                    ) + [source_factor] * len(source_tokens)
                     source_tokens = (
                         source_context_tokens + [Token(CONCAT_SYMBOL)] + source_tokens
                     )
+                    if self._source_add_factors:
+                        fields["source_factors"] = TextField(
+                            source_factors, self._source_factor_indexers
+                        )
                 else:
                     fields["source_context_tokens"] = TextField(
                         source_context_tokens, self._source_token_indexers

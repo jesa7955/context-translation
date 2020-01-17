@@ -1,5 +1,5 @@
 {
-  type: 'composed_seq2seq',
+  type: 'factored_composed_seq2seq',
   source_text_embedder: {
     token_embedders: {
       tokens: {
@@ -10,9 +10,20 @@
       },
     },
   },
+  source_factor_method: 'concat',
+  source_factor_embedder: {
+    token_embedders: {
+      factors: {
+        type: 'embedding',
+        embedding_dim: 16,
+        trainable: true,
+        vocab_namespace: 'source_factors',
+      },
+    },
+  },
   encoder: {
     type: 'stacked_self_attention',
-    input_dim: 512,
+    input_dim: 528,
     hidden_dim: 512,
     projection_dim: 512,
     feedforward_hidden_dim: 2048,

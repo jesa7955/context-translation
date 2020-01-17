@@ -1,6 +1,8 @@
 import collections
 from typing import Dict, Union, Optional, Any
 import logging
+import heapq
+import itertools
 
 from overrides import overrides
 import torch
@@ -34,7 +36,7 @@ class ContextSentenceFilter(Model):
         vocab: Vocabulary,
         model_name: str,
         num_labels: int,
-        translation_factor: float = 0.0,
+        translation_factor: float = 0.5,
         seq_decoder: SeqDecoder = None,
         decoding_dim: int = 512,
         target_embedding_dim: int = 512,
@@ -127,26 +129,24 @@ class ContextSentenceFilter(Model):
             loss = self._loss(logits, label.long().view(-1))
             self._accuracy(logits, label)
 
-            if self.training and target_tokens:
+            if self.training and target_tokens and self._seq_decoder:
                 batch_size, bert_dim = pooled.shape
                 state = {
                     "source_mask": torch.ones(batch_size, 1, device=pooled.device),
                     "encoder_outputs": pooled.view(batch_size, 1, bert_dim),
                 }
                 decoder_loss = self._seq_decoder(state, target_tokens)["loss"]
+                output_dict["dec_loss"] = decoder_loss
                 loss = (
                     1 - self._translation_factor
                 ) * loss + self._translation_factor * decoder_loss
             output_dict["loss"] = loss
         else:
-            output_dict["results"] = collections.defaultdict(
-                lambda: collections.defaultdict(list)
-            )
-            for d_id, s_id, cs_id, score in zip(
-                doc_id, sent_id, context_sent_id, probs[:, 1]
-            ):
-                output_dict["results"][d_id][s_id].append((cs_id, score))
-            output_dict["results"] = dict(output_dict["results"])
+            output_dict["results"] = [
+                (d_id, s_id, cs_id)
+                for d_id, s_id, cs_id in zip(doc_id, sent_id, context_sent_id)
+            ]
+
         return output_dict
 
     @overrides

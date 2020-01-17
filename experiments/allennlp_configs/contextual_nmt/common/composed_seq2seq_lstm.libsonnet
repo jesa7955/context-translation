@@ -11,7 +11,7 @@
     },
   },
   encoder: {
-    type: 'stacked_lstm',
+    type: 'lstm',
     num_layers: 2,
     hidden_size: 500,
     input_size: 500,
@@ -25,18 +25,16 @@
       type: 'bleu',
     },
     decoder_net: {
-      type: 'stacked_lstm_cell',
+      type: 'lstm_cell',
       attention: {
         type: 'additive',
         vector_dim: 500,
         matrix_dim: 500,
       },
-      layer_num: 2,
-      hidden_dim: 500,
       decoding_dim: 500,
       target_embedding_dim: 500,
     },
-    max_decoding_steps: 85,
+    max_decoding_steps: 128,
     target_embedder: {
       embedding_dim: 500,
       vocab_namespace: 'target_tokens',

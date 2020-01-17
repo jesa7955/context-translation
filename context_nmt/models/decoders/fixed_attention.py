@@ -17,4 +17,4 @@ class FixedAttention(Attention):
     def _forward_internal(
         self, vector: torch.Tensor, matrix: torch.Tensor = None
     ) -> torch.Tensor:
-        return torch.ones(matrix.shape()[:-1], device=matrix.device)
+        return torch.ones(matrix.shape[:-1], device=matrix.device)

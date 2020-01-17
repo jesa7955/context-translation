@@ -49,7 +49,9 @@ class MergeJijiFiles(gokart.TaskOnKart):
                 if not self.quality_aware or score >= self.score_threhold:
                     documents[doc_id]["en"].append(en_sent.strip())
                     documents[doc_id]["ja"].append(ja_sent)
-                    documents[doc_id]["pairs"].append((sent_id - 1, score))
+                    documents[doc_id]["pairs"].append(
+                        (len(documents[doc_id]["pairs"]) - 1, score)
+                    )
         logger.info(f"There are {len(documents)} documents")
         documents = dict(documents)
         # for doc_id, document in tqdm.tqdm(documents.items(), total=len(documents)):
@@ -92,6 +94,50 @@ class GenerateJijiDataSplits(gokart.TaskOnKart):
         for name, split in (("train", train), ("dev", dev), ("test", test)):
             with open(f"{self.target_path}/{name}.json", "w") as target:
                 json.dump(split, target, ensure_ascii=False)
+
+
+class GenerateJijiPlainData(gokart.TaskOnKart):
+    task_namespace = "context_nmt"
+    jiji_source_path = luigi.Parameter()
+    target_path = luigi.Parameter()
+    dev_proportion = luigi.FloatParameter()
+    test_proportion = luigi.FloatParameter()
+    quality_aware = luigi.BoolParameter()
+    score_threhold = luigi.FloatParameter(default=0.3)
+
+    def requires(self):
+        return MergeJijiFiles(
+            source_path=self.jiji_source_path,
+            quality_aware=self.quality_aware,
+            score_threhold=self.score_threhold,
+        )
+
+    def output(self):
+        return self.input()
+
+    def run(self):
+        documents = self.load()
+        test_size = self.test_proportion
+        dev_size = self.dev_proportion / (1 - test_size)
+        train, test = map(
+            dict, train_test_split(list(documents.items()), test_size=test_size)
+        )
+        train, dev = map(
+            dict, train_test_split(list(train.items()), test_size=dev_size)
+        )
+        if not os.path.isdir(self.target_path):
+            os.mkdir(self.target_path)
+        for name, split in (("train", train), ("dev", dev), ("test", test)):
+            target = {
+                lang: open(f"{self.target_path}/{name}.{lang}", "w")
+                for lang in ("en", "ja")
+            }
+            for _, doc in split.items():
+                for sent_id, score in doc["pairs"]:
+                    for lang in ("en", "ja"):
+                        target[lang].write(doc[lang][sent_id].strip() + "\n")
+            for f in target.values():
+                f.close()
 
 
 class TrainSentencepieceModels(gokart.TaskOnKart):
