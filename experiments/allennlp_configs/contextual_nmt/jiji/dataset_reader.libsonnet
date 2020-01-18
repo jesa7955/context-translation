@@ -1,4 +1,12 @@
-function(trans_mode, class_mode, src_tokenizer, tgt_tokenizer, src_indexers={}, tgt_indexers={}, share_vocabulary=false, source_add_factors=false) {
+function(trans_mode,
+         class_mode,
+         src_tokenizer,
+         tgt_tokenizer,
+         src_indexers={},
+         tgt_indexers={},
+         share_vocabulary=false,
+         source_add_factors=false,
+         cache_directory=null) {
   type: 'jiji',
   context_size: 1,
   window_size: 1,
@@ -21,4 +29,5 @@ function(trans_mode, class_mode, src_tokenizer, tgt_tokenizer, src_indexers={}, 
   target_tokenizer: tgt_tokenizer,
   share_vocabulary: share_vocabulary,
   source_add_factors: source_add_factors,
+  cache_directory: cache_directory,
 }

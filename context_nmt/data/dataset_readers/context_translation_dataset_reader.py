@@ -62,8 +62,9 @@ class ContextTranslationDatasetReader(DatasetReader):
         source_add_factors: bool = False,
         source_only: bool = False,
         lazy: bool = False,
+        cache_directory: str = None,
     ) -> None:
-        super().__init__(lazy=lazy)
+        super().__init__(lazy=lazy, cache_directory=cache_directory)
         self._window_size = window_size
         self._context_size = context_size
         self._source_lang = source_lang

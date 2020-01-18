@@ -112,8 +112,9 @@ class ContextSentenceFilter(Model):
         loss : torch.FloatTensor, optional
             A scalar loss to be optimised.
         """
-        input_ids = source_tokens[self._index]
-        token_type_ids = source_tokens[f"{self._index}-type-ids"]
+        inputs = source_tokens[self._index]
+        input_ids = inputs["token_ids"]
+        token_type_ids = inputs["token_type_ids"]
         input_mask = (input_ids != 0).long()
 
         _, pooled = self.transformer(

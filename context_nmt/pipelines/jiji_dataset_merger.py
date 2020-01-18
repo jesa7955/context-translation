@@ -1,3 +1,4 @@
+from typing import Dict
 import collections
 import glob
 import logging
@@ -15,43 +16,41 @@ from sklearn.model_selection import train_test_split
 logger = logging.getLogger("luigi-interface")
 
 
+def read_raw_jiji(docs: Dict, source_path: str):
+    for file_path in glob.glob(source_path + "/*.txt"):
+        with open(file_path) as source:
+            bi_texts = re.split(r"^# |\n# ", source.read())[1:]
+        for bi_text in bi_texts:
+            lines = bi_text.strip().split("\n")
+            header = lines[0]
+            doc_id, sent_id, score = re.findall(
+                r"(\d*)_BODY-JE-(\d*) score=(\d\.?\d*)", header
+            )[0]
+            en_sent, ja_sent = "", ""
+            score, sent_id = float(score), int(sent_id)
+            for line in lines[1:]:
+                lang, sentence = line.split(": ", maxsplit=1)
+                if lang[:2] == "en":
+                    en_sent += " " + sentence
+                else:
+                    ja_sent += sentence
+            docs[doc_id]["en"].append(en_sent.strip())
+            docs[doc_id]["ja"].append(ja_sent)
+            docs[doc_id]["pairs"].append((sent_id - 1, score))
+
+
 class MergeJijiFiles(gokart.TaskOnKart):
     task_namespace = "context_nmt"
     source_path = luigi.Parameter()
     quality_aware = luigi.BoolParameter()
     score_threhold = luigi.FloatParameter()
 
-    def requires(self):
-        pass
-
     def output(self):
         return self.make_target("merged_jiji_splits.pkl")
 
     def run(self):
         documents = collections.defaultdict(lambda: collections.defaultdict(list))
-        for file_path in glob.glob(self.source_path + "/*.txt"):
-            with open(file_path) as source:
-                bi_texts = re.split(r"^# |\n# ", source.read())[1:]
-            for bi_text in bi_texts:
-                lines = bi_text.strip().split("\n")
-                header = lines[0]
-                doc_id, sent_id, score = re.findall(
-                    r"(\d*)_BODY-JE-(\d*) score=(\d\.?\d*)", header
-                )[0]
-                en_sent, ja_sent = "", ""
-                score, sent_id = float(score), int(sent_id)
-                for line in lines[1:]:
-                    lang, sentence = line.split(": ", maxsplit=1)
-                    if lang[:2] == "en":
-                        en_sent += " " + sentence
-                    else:
-                        ja_sent += sentence
-                if not self.quality_aware or score >= self.score_threhold:
-                    documents[doc_id]["en"].append(en_sent.strip())
-                    documents[doc_id]["ja"].append(ja_sent)
-                    documents[doc_id]["pairs"].append(
-                        (len(documents[doc_id]["pairs"]) - 1, score)
-                    )
+        read_raw_jiji(documents, self.source_path)
         logger.info(f"There are {len(documents)} documents")
         documents = dict(documents)
         # for doc_id, document in tqdm.tqdm(documents.items(), total=len(documents)):

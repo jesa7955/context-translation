@@ -13,7 +13,7 @@ black = "*"
 
 [packages]
 Sphinx = "*"
-allennlp = {git = "https://github.com/allenai/allennlp.git"}
+allennlp = {git = "https://github.com/allenai/allennlp.git",ref = "master"}
 transformers = "*"
 luigi = "*"
 gokart = "*"

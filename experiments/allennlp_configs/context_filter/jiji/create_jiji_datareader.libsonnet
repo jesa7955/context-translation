@@ -1,4 +1,7 @@
-function (trans_mode, class_mode, source_only=false) {
+function(trans_mode,
+         class_mode,
+         source_only=false,
+         cache_directory=null) {
   type: 'jiji',
   window_size: 1,
   context_size: 1,
@@ -9,7 +12,7 @@ function (trans_mode, class_mode, source_only=false) {
   source_only: source_only,
   source_token_indexers: {
     transformer: {
-      type: 'pretrained_transformer_customized',
+      type: 'customized_pretrained_transformer',
       model_name: 'bert-base-uncased',
     },
   },
@@ -21,4 +24,5 @@ function (trans_mode, class_mode, source_only=false) {
     type: 'sentencepiece',
     model_path: '/data/10/litong/jiji-with-document-boundaries/jiji_sentencepiece_ja.model',
   },
+  cache_directory: cache_directory,
 }

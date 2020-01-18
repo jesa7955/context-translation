@@ -24,7 +24,14 @@ local common_token_indexers = {
     namespace: 'tokens',
   },
 };
-local train_dataset_reader = create_dataset_reader('2-to-1', 'none', share_tokenizer, share_tokenizer, common_token_indexers, common_token_indexers, true);
-local val_dataset_reader = create_dataset_reader('2-to-1', 'none', share_tokenizer, share_tokenizer, common_token_indexers, common_token_indexers, true);
+local train_dataset_reader = create_dataset_reader('1-to-1',
+                                                   'none',
+                                                   share_tokenizer,
+                                                   share_tokenizer,
+                                                   common_token_indexers,
+                                                   common_token_indexers,
+                                                   true,
+                                                   cache_directory='/home/litong/context_translation/resource/cache_test');
+local val_dataset_reader = create_dataset_reader('1-to-1', 'none', share_tokenizer, share_tokenizer, common_token_indexers, common_token_indexers, true);
 
 create_configuration(train_dataset_reader, val_dataset_reader, create_trainer(1), model)

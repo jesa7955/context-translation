@@ -3,18 +3,16 @@ import logging
 
 from overrides import overrides
 from transformers.tokenization_auto import AutoTokenizer
-import torch
 
-from allennlp.common.util import pad_sequence_to_length
 from allennlp.data.vocabulary import Vocabulary
 from allennlp.data.tokenizers.token import Token
-from allennlp.data.token_indexers.token_indexer import TokenIndexer
+from allennlp.data.token_indexers.token_indexer import TokenIndexer, IndexedTokenList
 
 logger = logging.getLogger(__name__)
 
 
-@TokenIndexer.register("pretrained_transformer_customized")
-class PretrainedTransformerIndexerCustomized(TokenIndexer[int]):
+@TokenIndexer.register("customized_pretrained_transformer")
+class CustomizedPretrainedTransformerIndexer(TokenIndexer):
     """
     This ``TokenIndexer`` assumes that Tokens already have their indexes in them (see ``text_id`` field).
     We still require ``model_name`` because we want to form allennlp vocabulary from pretrained one.
@@ -22,8 +20,8 @@ class PretrainedTransformerIndexerCustomized(TokenIndexer[int]):
     corresponding :class:`PretrainedTransformerTokenizer` to tokenize your input.  Otherwise you'll
     have a mismatch between your tokens and your vocabulary, and you'll get a lot of UNK tokens.
 
-    Parameters
-    ----------
+    # Parameters
+
     model_name : ``str``
         The name of the ``transformers`` model to use.
     namespace : ``str``, optional (default=``tags``)
@@ -77,7 +75,7 @@ class PretrainedTransformerIndexerCustomized(TokenIndexer[int]):
 
     @overrides
     def tokens_to_indices(
-        self, tokens: List[Token], vocabulary: Vocabulary, index_name: str
+        self, tokens: List[Token], vocabulary: Vocabulary
     ) -> Dict[str, List[int]]:
         if not self._added_to_vocabulary:
             self._add_encoding_to_vocabulary(vocabulary)
@@ -103,32 +101,14 @@ class PretrainedTransformerIndexerCustomized(TokenIndexer[int]):
         attention_mask = [1] * len(indices)
 
         return {
-            index_name: indices,
-            f"{index_name}-type-ids": type_ids,
+            "token_ids": indices,
+            "token_type_ids": type_ids,
             "mask": attention_mask,
         }
 
     @overrides
-    def get_padding_lengths(self, token: int) -> Dict[str, int]:
-        return {}
-
-    @overrides
-    def as_padded_tensor(
-        self,
-        tokens: Dict[str, List[int]],
-        desired_num_tokens: Dict[str, int],
-        padding_lengths: Dict[str, int],
-    ) -> Dict[str, torch.Tensor]:
-        return {
-            key: torch.LongTensor(
-                pad_sequence_to_length(
-                    val,
-                    desired_num_tokens[key],
-                    default_value=lambda: self._padding_value,
-                )
-            )
-            for key, val in tokens.items()
-        }
+    def get_empty_token_list(self) -> IndexedTokenList:
+        return {"token_ids": [], "mask": []}
 
     def __eq__(self, other):
         if isinstance(other, PretrainedTransformerIndexer):

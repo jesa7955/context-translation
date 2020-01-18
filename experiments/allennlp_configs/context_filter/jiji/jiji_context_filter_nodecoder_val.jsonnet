@@ -1,7 +1,7 @@
 local create_dataset_reader = import 'create_jiji_datareader.libsonnet';
 
 {
-  dataset_reader: create_dataset_reader('2-to-1', 'train', true),
+  dataset_reader: create_dataset_reader('2-to-1', 'train'),
   validation_dataset_reader: create_dataset_reader("2-to-1", "inference"),
   iterator: {
     batch_size: 64,

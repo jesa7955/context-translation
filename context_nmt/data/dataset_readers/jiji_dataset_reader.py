@@ -45,6 +45,7 @@ class JijiDatasetReader(ContextTranslationDatasetReader):
         source_add_factors: bool = False,
         source_only: bool = False,
         lazy: bool = False,
+        cache_directory: str = None,
     ) -> None:
         super().__init__(
             window_size=window_size,
@@ -67,6 +68,7 @@ class JijiDatasetReader(ContextTranslationDatasetReader):
             source_add_factors=source_add_factors,
             source_only=source_only,
             lazy=lazy,
+            cache_directory=cache_directory,
         )
         self._score_threshold = score_threshold
         self._read_from_raw = read_from_raw
