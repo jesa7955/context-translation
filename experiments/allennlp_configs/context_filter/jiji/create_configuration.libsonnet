@@ -1,21 +1,15 @@
-local create_dataset_reader = import 'create_jiji_datareader.libsonnet';
+local num_epochs = 2;
 
-{
-  dataset_reader: create_dataset_reader('2-to-1', 'train'),
-  // validation_dataset_reader: create_dataset_reader("2-to-1", "inference"),
+function(dataset_reader,
+         bert_name='bert-base-uncased') {
+  dataset_reader: dataset_reader,
   iterator: {
     batch_size: 64,
-    sorting_keys: [
-      [
-        'source_tokens',
-        'num_tokens',
-      ],
-    ],
     type: 'bucket',
   },
   model: {
     type: 'context_sentence_filter',
-    model_name: 'bert-base-uncased',
+    model_name: bert_name,
     num_labels: 2,
     load_classifier: true,
     transformer_trainable: true,
@@ -37,20 +31,17 @@ local create_dataset_reader = import 'create_jiji_datareader.libsonnet';
       target_namespace: 'target_tokens',
     },
   },
-  train_data_path: '/data/10/litong/jiji-with-document-boundaries/train.json',
-  validation_data_path: '/data/10/litong/jiji-with-document-boundaries/dev.json',
-  test_data_path: '/data/10/litong/jiji-with-document-boundaries/test.json',
-  //train_data_path: '/data/10/litong/jiji-with-document-boundaries/dev.json',
-  //validation_data_path: '/data/10/litong/jiji-with-document-boundaries/test.json',
-  //distributed: {
-  //  cuda_devices: [0, 1],
-  //},
+  train_data_path: '/home/litong/context_translation/resources/train_aeabd4a49ce40d291d72fb22e4f84f70.pkl',
+  validation_data_path: '/home/litong/context_translation/resources/valid_93dd7f59179d59481dffa319f8eceadb.pkl',
+  test_data_path: '/home/litong/context_translation/resources/test_3c5cba7d2f64b7fb2d6b5013adc7a888.pkl',
+  //train_data_path: '/home/litong/context_translation/resources/valid_93dd7f59179d59481dffa319f8eceadb.pkl',
+  //validation_data_path: '/home/litong/context_translation/resources/test_3c5cba7d2f64b7fb2d6b5013adc7a888.pkl',
   trainer: {
     cuda_device: 0,
-    num_epochs: 1,
+    num_epochs: num_epochs,
     num_serialized_models_to_keep: 1,
     optimizer: {
-      type: 'bert_adam',
+      type: 'adamw',
       lr: 5e-5,
       parameter_groups: [[
         [
@@ -66,8 +57,8 @@ local create_dataset_reader = import 'create_jiji_datareader.libsonnet';
     },
     learning_rate_scheduler: {
       type: 'slanted_triangular',
-      num_epochs: 1,
-      num_steps_per_epoch: 2300,
+      num_epochs: num_epochs,
+      num_steps_per_epoch: 21427,
     },
     patience: 5,
     validation_metric: '+accuracy',

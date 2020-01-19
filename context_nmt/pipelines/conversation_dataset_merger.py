@@ -15,6 +15,9 @@ import gokart
 import sentencepiece as spm
 
 from context_nmt.pipelines.jiji_dataset_merger import read_raw_jiji
+from context_nmt.data.dataset_readers.context_translation_dataset_reader import (
+    read_context_index_file,
+)
 
 
 logger = logging.getLogger("luigi-interface")
@@ -59,7 +62,7 @@ class MergeConversationFiles(gokart.TaskOnKart):
         self.dump(dict(docs))
 
 
-class GeneratePlainText(gokart.TaskOnKart):
+class MergeMultipleDataset(gokart.TaskOnKart):
     task_namespace = "context_nmt"
     split_name = luigi.Parameter()
     dataset_names = luigi.ListParameter()
@@ -83,6 +86,7 @@ class GeneratePlainText(gokart.TaskOnKart):
 
 class GenerateConversationSplits(gokart.TaskOnKart):
     task_namespace = "context_nmt"
+    context_pairs = None
     train_dataset_names = luigi.ListParameter()
     train_source_paths = luigi.ListParameter()
     valid_dataset_names = luigi.ListParameter()
@@ -94,15 +98,14 @@ class GenerateConversationSplits(gokart.TaskOnKart):
     source_lang = luigi.Parameter(default="en")
     target_lang = luigi.Parameter(default="ja")
     data_mode = luigi.Parameter(default="1-to-1")
+    context_bias = luigi.IntParameter(default=1)
     context_sentence_index_file = luigi.Parameter(default=None)
-    source_max_sequence_length = luigi.IntParameter(default=128)
-    target_max_sequence_length = luigi.IntParameter(default=128)
     score_threhold = luigi.FloatParameter(default=0.3)
     vocab_size = luigi.IntParameter(default=32000)
     normalization_rule_name = luigi.Parameter(default="nmt_nfkc_cf")
 
     def requires(self):
-        requiements = {}
+        requirements = {}
         for split_name, (dataset_names, source_paths) in zip(
             SPLIT_NAMES,
             (
@@ -111,12 +114,12 @@ class GenerateConversationSplits(gokart.TaskOnKart):
                 (self.test_dataset_names, self.test_source_paths),
             ),
         ):
-            requiements[split_name] = GeneratePlainText(
+            requirements[split_name] = MergeMultipleDataset(
                 split_name=split_name,
                 dataset_names=dataset_names,
                 source_paths=source_paths,
             )
-        return requiements
+        return requirements
 
     def output(self):
         outputs = {}
@@ -129,6 +132,7 @@ class GenerateConversationSplits(gokart.TaskOnKart):
         return outputs
 
     def run(self):
+        self.context_pairs = read_context_index_file(self.context_sentence_index_file)
         data = {split_name: self.load(split_name) for split_name in SPLIT_NAMES}
         if not os.path.exists(self.sentencepiece_model_path):
             train_en = list(
@@ -145,11 +149,11 @@ class GenerateConversationSplits(gokart.TaskOnKart):
             self.train_sentencepiece_from_list(sentences, self.sentencepiece_model_path)
         self.processor.load(self.sentencepiece_model_path)
         for split_name in SPLIT_NAMES:
-            pairs = self.get_pairs(data[split_name], self.context_sentence_index_file)
+            pairs = self.get_pairs(data[split_name])
             for lang in (self.source_lang, self.target_lang):
                 self.dump("\n".join(pairs[lang]), f"{split_name}_{lang}")
 
-    def get_pairs(self, docs: Dict, context_index_file: str):
+    def get_pairs(self, docs: Dict):
         pairs = {self.source_lang: [], self.target_lang: []}
         for doc_id, doc in docs.items():
             parallel_doc = set(
@@ -160,16 +164,18 @@ class GenerateConversationSplits(gokart.TaskOnKart):
                 ]
             )
             for sent_id in parallel_doc:
-                source_context = None
                 source, target = [
                     self.processor.encode_as_pieces(doc[lang][sent_id])
                     for lang in (self.source_lang, self.target_lang)
                 ]
+                source_context = None
                 if "2-to-1" in str(self.data_mode):
-                    if context_index_file is None or not os.path.exists(
-                        context_index_file
-                    ):
-                        context_sent_index = sent_id - 1
+                    if self.context_pairs is None:
+                        context_sent_index = (
+                            -1
+                            if sent_id < self.context_bias
+                            else sent_id - self.context_bias
+                        )
                         if self.data_mode == "2-to-1":
                             while (
                                 context_sent_index >= 0
@@ -178,29 +184,17 @@ class GenerateConversationSplits(gokart.TaskOnKart):
                                 ]
                             ):
                                 context_sent_index -= 1
-                            source_context = docs[doc_id][self.source_lang][
-                                context_sent_index
-                            ]
                         else:
-                            source_context = (
-                                docs[doc_id][self.source_lang][context_sent_index]
-                                if context_sent_index in parallel_doc
-                                else None
-                            )
-                            if source_context is None:
+                            if context_sent_index not in parallel_doc:
                                 continue
                     else:
-                        # TODO Read from filtered file
-                        pass
+                        context_sent_index = self.context_pairs[doc_id][sent_id][0]
+                    source_context = docs[doc_id][self.source_lang][context_sent_index]
                 if source_context:
                     source_context = self.processor.encode_as_pieces(source_context)
                     source = source_context + [CONCAT_TOKEN] + source
-                if (
-                    len(source) <= self.source_max_sequence_length
-                    and len(target) <= self.target_max_sequence_length
-                ):
-                    pairs[self.source_lang].append(" ".join(source))
-                    pairs[self.target_lang].append(" ".join(target))
+                pairs[self.source_lang].append(" ".join(source))
+                pairs[self.target_lang].append(" ".join(target))
         return pairs
 
     def train_sentencepiece_from_list(self, sentences: Dict, model_path: str):
@@ -243,6 +237,7 @@ class RunFairseqTraining(gokart.TaskOnKart):
     source_lang = luigi.Parameter(default="en")
     target_lang = luigi.Parameter(default="ja")
     data_mode = luigi.Parameter(default="1-to-1")
+    context_bias = luigi.IntParameter(default=1)
     context_sentence_index_file = luigi.Parameter(default=None)
     score_threhold = luigi.FloatParameter(default=0.3)
     vocab_size = luigi.IntParameter(default=32000)
@@ -268,19 +263,27 @@ class RunFairseqTraining(gokart.TaskOnKart):
             source_lang=self.source_lang,
             target_lang=self.target_lang,
             data_mode=self.data_mode,
+            context_bias=self.context_bias,
             context_sentence_index_file=self.context_sentence_index_file,
             score_threhold=self.score_threhold,
             vocab_size=self.vocab_size,
             normalization_rule_name=self.normalization_rule_name,
-            source_max_sequence_length=self.source_max_sequence_length,
-            target_max_sequence_length=self.target_max_sequence_length,
         )
 
     def get_experiment_name(self):
-        experiment_name = "_".join(
-            list(self.train_dataset_names)
-            + [self.data_mode, self.source_lang, self.target_lang]
-        )
+        name_components = list(self.train_dataset_names) + [
+            self.data_mode,
+            self.source_lang,
+            self.target_lang,
+        ]
+        if self.data_mode != "1-to-1":
+            if self.context_sentence_index_file:
+                name_components.append(
+                    f"filtered_{str(self.context_sentence_index_file).split('/')[-1]}"
+                )
+            else:
+                name_components.append(f"context_bias_{self.context_bias}")
+        experiment_name = "_".join(name_components)
         return experiment_name
 
     def output(self):
@@ -316,10 +319,17 @@ class RunFairseqTraining(gokart.TaskOnKart):
         # Train Model
         fairseq_checkpoint_path = f"{self.experiment_path}/{self.get_experiment_name()}"
         train_params = ["fairseq-train", fairseq_data_path]
+        train_params += [
+            "--eval-bleu",
+            "--eval-bleu-args",
+            "'{\"beam\": 6}'",
+        ]
         train_params += ["--tokenizer", "space"]
         train_params += ["--arch", "transformer"]
         train_params += ["--share-decoder-input-output-embed", "--share-all-embeddings"]
         train_params += ["--optimizer", "adam", "--adam-betas", "'(0.9, 0.98)'"]
+        train_params += ["--max-source-positions", str(self.source_max_sequence_length)]
+        train_params += ["--max-target-positions", str(self.target_max_sequence_length)]
         train_params += [
             "--lr",
             "1e-4",
@@ -355,6 +365,4 @@ class RunFairseqTraining(gokart.TaskOnKart):
         train_return = subprocess.run(
             " ".join(train_params), shell=True, check=True, env=enviroment_variables,
         )
-        self.dump(
-            "_".join(map(str, (preprocess_return.returncode, train_return.returncode)))
-        )
+        self.dump(" ".join(preprocess_params + train_params))

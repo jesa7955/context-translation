@@ -1,10 +1,12 @@
 import collections
 import glob
 import logging
-from typing import Dict
-import json
-from overrides import overrides
 import re
+import os
+import pickle
+import json
+from typing import Dict
+from overrides import overrides
 
 from allennlp.common.file_utils import cached_path
 from allennlp.data.dataset_readers.dataset_reader import DatasetReader
@@ -23,7 +25,6 @@ class JijiDatasetReader(ContextTranslationDatasetReader):
     def __init__(
         self,
         window_size: int = 6,
-        context_size: int = 3,
         score_threshold: float = float("-inf"),
         read_from_raw: bool = False,
         source_lang: str = "en",
@@ -44,12 +45,12 @@ class JijiDatasetReader(ContextTranslationDatasetReader):
         source_add_end_token: bool = False,
         source_add_factors: bool = False,
         source_only: bool = False,
+        context_sentence_index_file: str = None,
         lazy: bool = False,
         cache_directory: str = None,
     ) -> None:
         super().__init__(
             window_size=window_size,
-            context_size=context_size,
             source_lang=source_lang,
             target_lang=target_lang,
             source_tokenizer=source_tokenizer,
@@ -67,6 +68,7 @@ class JijiDatasetReader(ContextTranslationDatasetReader):
             source_add_end_token=source_add_end_token,
             source_add_factors=source_add_factors,
             source_only=source_only,
+            context_sentence_index_file=context_sentence_index_file,
             lazy=lazy,
             cache_directory=cache_directory,
         )
@@ -103,8 +105,16 @@ class JijiDatasetReader(ContextTranslationDatasetReader):
                     documents[doc_id]["ja"].append(ja_sent)
                     documents[doc_id]["pairs"].append((sent_id - 1, score))
         else:
-            with open(file_path) as source:
-                documents = json.load(source)
+            extension = os.path.splitext(file_path)[1]
+            logger.info(f"Input file is a {extension} file")
+            if extension == ".json":
+                with open(file_path) as source:
+                    documents = json.load(source)
+            elif extension == ".pkl":
+                with open(file_path, "rb") as source:
+                    documents = pickle.load(source)
+            else:
+                documents = {}
         return documents
 
     @overrides

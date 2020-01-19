@@ -143,7 +143,7 @@ class ContextSentenceFilter(Model):
                 ) * loss + self._translation_factor * decoder_loss
             output_dict["loss"] = loss
         else:
-            output_dict["results"] = [
+            output_dict["data_indexers"] = [
                 (d_id, s_id, cs_id)
                 for d_id, s_id, cs_id in zip(doc_id, sent_id, context_sent_id)
             ]

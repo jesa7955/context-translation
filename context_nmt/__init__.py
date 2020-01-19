@@ -5,4 +5,5 @@ from context_nmt.pipelines.jiji_dataset_merger import (
 from context_nmt.pipelines.conversation_dataset_merger import (
     GenerateConversationSplits,
     RunFairseqTraining,
+    MergeMultipleDataset,
 )
