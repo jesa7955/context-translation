@@ -7,7 +7,6 @@ local dataset_reader = create_dataset_reader('2-to-1',
                                              true,
                                              bert_name=bert_name,
                                              source_lang='ja',
-                                             target_lang='en',
-                                             cache_directory='/data/10/litong/context_filter_infer_cache_ja_en');
+                                             target_lang='en')
 
 create_configuration(dataset_reader, bert_name=bert_name)

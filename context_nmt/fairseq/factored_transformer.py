@@ -305,10 +305,12 @@ class FactorTransformerEncoder(FairseqEncoder):
     def forward_embedding(self, src_tokens, seg_tokens):
         # embed tokens and positions
         x = embed = self.embed_scale * self.embed_tokens(src_tokens)
-        factor_embed = self.factor_embed_tokens(seg_tokens)
+        factor_embed = self.factor_embed_tokens(seg_tokens)  # Plan A:
+        # Plan B: factor_embed = self.embed_scale * self.factor_embed_tokens(seg_tokens)
+        # Plan B: x = torch.cat((x, factor_embed), dim=-1)
         if self.embed_positions is not None:
             x = embed + self.embed_positions(src_tokens)
-        x = torch.cat((x, factor_embed), dim=-1)
+        x = torch.cat((x, factor_embed), dim=-1)  # Plan A:
         if self.layernorm_embedding:
             x = self.layernorm_embedding(x)
         x = F.dropout(x, p=self.dropout, training=self.training)

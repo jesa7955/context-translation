@@ -96,6 +96,10 @@ class ContextTranslationDatasetReader(DatasetReader):
         self._source_add_factors = source_add_factors
         self._source_only = source_only
         self._context_pairs = read_context_index_file(context_sentence_index_file)
+        if self._context_pairs:
+            logger.info("We have some gold indicators!!!")
+        else:
+            logger.info("We have to generate exmaples ourselves")
 
         self._source_token_indexers = (
             source_token_indexers
