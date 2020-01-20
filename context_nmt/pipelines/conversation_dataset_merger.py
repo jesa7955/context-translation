@@ -15,15 +15,29 @@ import gokart
 import sentencepiece as spm
 
 from context_nmt.pipelines.jiji_dataset_merger import read_raw_jiji
-from context_nmt.data.dataset_readers.context_translation_dataset_reader import (
-    read_context_index_file,
-)
 
 
 logger = logging.getLogger("luigi-interface")
 SPECIAL_CHARACTER_COVERAGES_LANG = set(["ja", "zh", "kr", "en_ja"])
 CONCAT_TOKEN = "@@CONCAT@@"
 SPLIT_NAMES = ("train", "valid", "test")
+
+
+def read_context_index_file(file_path: str, key: str = "logits"):
+    context_pairs = None
+    if file_path and os.path.exists(file_path):
+        context_pairs = collections.defaultdict(dict)
+        with open(file_path, "r") as source:
+            for line in source:
+                model_output = json.loads(line)
+                score = model_output[key][1]
+                d_id, s_id, cs_id = model_output["data_indexers"]
+                if (
+                    not s_id in context_pairs[d_id]
+                    or score > context_pairs[d_id][s_id][1]
+                ):
+                    context_pairs[d_id][s_id] = (cs_id, score)
+    return context_pairs
 
 
 class MergeConversationFiles(gokart.TaskOnKart):
@@ -133,6 +147,10 @@ class GenerateConversationSplits(gokart.TaskOnKart):
 
     def run(self):
         self.context_pairs = read_context_index_file(self.context_sentence_index_file)
+        if self.context_pairs:
+            logger.info("We have some gold indicators!!!")
+        else:
+            logger.info("We have to generate our own context")
         data = {split_name: self.load(split_name) for split_name in SPLIT_NAMES}
         if not os.path.exists(self.sentencepiece_model_path):
             train_en = list(
@@ -250,6 +268,9 @@ class RunFairseqTraining(gokart.TaskOnKart):
     save_interval = luigi.IntParameter(default=8000)
     source_max_sequence_length = luigi.IntParameter(default=128)
     target_max_sequence_length = luigi.IntParameter(default=128)
+    add_source_factor = luigi.BoolParameter()
+    source_factor_embed_dim = luigi.IntParameter(default=8)
+    source_factor_type_num = luigi.IntParameter(default=2)
 
     def requires(self):
         return GenerateConversationSplits(
@@ -276,6 +297,8 @@ class RunFairseqTraining(gokart.TaskOnKart):
             self.source_lang,
             self.target_lang,
         ]
+        if self.add_source_factor:
+            name_components.append("factored")
         if self.data_mode != "1-to-1":
             if self.context_sentence_index_file:
                 name_components.append(
@@ -299,9 +322,15 @@ class RunFairseqTraining(gokart.TaskOnKart):
         fairseq_data_path = (
             f"{self.experiment_path}/data-bin/{self.get_experiment_name()}"
         )
+        fairseq_checkpoint_path = f"{self.experiment_path}/{self.get_experiment_name()}"
+        logger.info(f"fairseq data is put at {fairseq_data_path}")
+        logger.info(f"fairseq model is put at {fairseq_checkpoint_path}")
 
         # Prepare Data
         preprocess_params = ["fairseq-preprocess", "--joined-dictionary"]
+        if self.add_source_factor:
+            preprocess_params += ["--task", "factored_translation"]
+            preprocess_params += ["--user-dir", "context_nmt"]
         preprocess_params += ["--workers", str(self.preprocess_workers)]
         preprocess_params += ["--source-lang", self.source_lang]
         preprocess_params += ["--target-lang", self.target_lang]
@@ -317,7 +346,6 @@ class RunFairseqTraining(gokart.TaskOnKart):
             )
 
         # Train Model
-        fairseq_checkpoint_path = f"{self.experiment_path}/{self.get_experiment_name()}"
         train_params = ["fairseq-train", fairseq_data_path]
         train_params += [
             "--eval-bleu",
@@ -325,7 +353,21 @@ class RunFairseqTraining(gokart.TaskOnKart):
             "'{\"beam\": 6}'",
         ]
         train_params += ["--tokenizer", "space"]
-        train_params += ["--arch", "transformer"]
+        if self.add_source_factor:
+            train_params += ["--arch", "factored_transformer"]
+            train_params += ["--task", "factored_translation"]
+            train_params += ["--user-dir", "context_nmt"]
+            train_params += [
+                "--source-factor-embed-dim",
+                str(self.source_factor_embed_dim),
+            ]
+            train_params += [
+                "--source-factor-type-num",
+                str(self.source_factor_type_num),
+            ]
+        else:
+            train_params += ["--arch", "transformer"]
+            train_params += ["--fp16"]
         train_params += ["--share-decoder-input-output-embed", "--share-all-embeddings"]
         train_params += ["--optimizer", "adam", "--adam-betas", "'(0.9, 0.98)'"]
         train_params += ["--max-source-positions", str(self.source_max_sequence_length)]
@@ -361,7 +403,7 @@ class RunFairseqTraining(gokart.TaskOnKart):
             "--tensorboard-logdir",
             f"{fairseq_checkpoint_path}/tensorboard-log",
         ]
-        train_params += ["--patience", "10", "--fp16", "--reset-optimizer"]
+        train_params += ["--patience", "10", "--reset-optimizer"]
         train_return = subprocess.run(
             " ".join(train_params), shell=True, check=True, env=enviroment_variables,
         )

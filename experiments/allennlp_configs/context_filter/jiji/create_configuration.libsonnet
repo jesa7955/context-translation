@@ -1,10 +1,11 @@
 local num_epochs = 2;
 
 function(dataset_reader,
-         bert_name='bert-base-uncased') {
+         bert_name='bert-base-uncased',
+         batch_size=64) {
   dataset_reader: dataset_reader,
   iterator: {
-    batch_size: 64,
+    batch_size: batch_size,
     type: 'bucket',
   },
   model: {
@@ -31,10 +32,10 @@ function(dataset_reader,
       target_namespace: 'target_tokens',
     },
   },
-  train_data_path: '/home/litong/context_translation/resources/train_aeabd4a49ce40d291d72fb22e4f84f70.pkl',
-  validation_data_path: '/home/litong/context_translation/resources/valid_93dd7f59179d59481dffa319f8eceadb.pkl',
+  train_data_path: '/home/litong/context_translation/resources/train_77b9dbd0538187438b8dd13a8f6b935c.pkl',
+  validataion_data_path: '/home/litong/context_translation/resources/valid_0a06896723176aff827aac15a2e1ac94.pkl',
   test_data_path: '/home/litong/context_translation/resources/test_3c5cba7d2f64b7fb2d6b5013adc7a888.pkl',
-  //train_data_path: '/home/litong/context_translation/resources/valid_93dd7f59179d59481dffa319f8eceadb.pkl',
+  //train_data_path: '/home/litong/context_translation/resources/valid_0a06896723176aff827aac15a2e1ac94.pkl',
   //validation_data_path: '/home/litong/context_translation/resources/test_3c5cba7d2f64b7fb2d6b5013adc7a888.pkl',
   trainer: {
     cuda_device: 0,
@@ -58,7 +59,7 @@ function(dataset_reader,
     learning_rate_scheduler: {
       type: 'slanted_triangular',
       num_epochs: num_epochs,
-      num_steps_per_epoch: 21427,
+      num_steps_per_epoch: 22000,
     },
     patience: 5,
     validation_metric: '+accuracy',

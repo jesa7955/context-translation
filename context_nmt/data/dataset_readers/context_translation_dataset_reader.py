@@ -21,6 +21,7 @@ from allennlp.common.util import START_SYMBOL, END_SYMBOL
 from allennlp.data.vocabulary import DEFAULT_OOV_TOKEN
 
 from context_nmt.data.tokenizers.sentencepiece_tokenizer import SentencepieceTokenizer
+from context_nmt.pipelines.conversation_dataset_merger import read_context_index_file
 
 CONCAT_SYMBOL = "@concat@"
 SEP_SYMBOL = "[SEP]"
@@ -29,23 +30,6 @@ CLS_SYMBOL = "[CLS]"
 SPECIAL_CHARACTER_COVERAGES_LANG = set(["ja", "zh", "kr"])
 
 logger = logging.getLogger(__name__)
-
-
-def read_context_index_file(file_path: str):
-    context_pairs = None
-    if file_path and os.path.exists(file_path):
-        context_pairs = defaultdict(dict)
-        with open(file_path, "r") as source:
-            for line in source:
-                model_output = json.loads(line)
-                score = model_output["logits"][1]
-                d_id, s_id, cs_id = model_output["data_indexers"]
-                if (
-                    not s_id in context_pairs[d_id]
-                    or score > context_pairs[d_id][s_id][1]
-                ):
-                    context_pairs[d_id][s_id] = (cs_id, score)
-    return context_pairs
 
 
 class ContextTranslationDatasetReader(DatasetReader):
