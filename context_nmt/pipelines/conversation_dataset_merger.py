@@ -8,6 +8,7 @@ import os
 import tempfile
 import copy
 import subprocess
+import itertools
 
 import luigi
 import pandas as pd
@@ -98,25 +99,14 @@ class MergeMultipleDataset(gokart.TaskOnKart):
         self.dump(data)
 
 
-class GenerateConversationSplits(gokart.TaskOnKart):
+class GenerateDataSplits(gokart.TaskOnKart):
     task_namespace = "context_nmt"
-    context_pairs = None
     train_dataset_names = luigi.ListParameter()
     train_source_paths = luigi.ListParameter()
     valid_dataset_names = luigi.ListParameter()
     valid_source_paths = luigi.ListParameter()
     test_dataset_names = luigi.ListParameter()
     test_source_paths = luigi.ListParameter()
-    sentencepiece_model_path = luigi.Parameter()
-    processor = spm.SentencePieceProcessor()
-    source_lang = luigi.Parameter(default="en")
-    target_lang = luigi.Parameter(default="ja")
-    data_mode = luigi.Parameter(default="1-to-1")
-    context_bias = luigi.IntParameter(default=1)
-    context_sentence_index_file = luigi.Parameter(default=None)
-    score_threhold = luigi.FloatParameter(default=0.3)
-    vocab_size = luigi.IntParameter(default=32000)
-    normalization_rule_name = luigi.Parameter(default="nmt_nfkc_cf")
 
     def requires(self):
         requirements = {}
@@ -134,6 +124,62 @@ class GenerateConversationSplits(gokart.TaskOnKart):
                 source_paths=source_paths,
             )
         return requirements
+
+    def output(self):
+        outputs = self.input()
+        outputs["all"] = self.make_target(
+            "_".join(
+                itertools.chain.from_iterable(
+                    (
+                        self.train_dataset_names,
+                        self.valid_dataset_names,
+                        self.test_dataset_names,
+                    )
+                )
+            )
+            + ".pkl"
+        )
+        return outputs
+
+    def run(self):
+        data = {split_name: self.load(split_name) for split_name in SPLIT_NAMES}
+        merged = {}
+        for split in data.values():
+            merged.update(split)
+        data["all"] = merged
+        for key, value in data.items():
+            self.dump(value, key)
+
+
+class GenerateFairseqDataSplits(gokart.TaskOnKart):
+    task_namespace = "context_nmt"
+    context_pairs = None
+    processor = spm.SentencePieceProcessor()
+    train_dataset_names = luigi.ListParameter()
+    train_source_paths = luigi.ListParameter()
+    valid_dataset_names = luigi.ListParameter()
+    valid_source_paths = luigi.ListParameter()
+    test_dataset_names = luigi.ListParameter()
+    test_source_paths = luigi.ListParameter()
+    sentencepiece_model_path = luigi.Parameter()
+    source_lang = luigi.Parameter(default="en")
+    target_lang = luigi.Parameter(default="ja")
+    data_mode = luigi.Parameter(default="1-to-1")
+    context_bias = luigi.IntParameter(default=1)
+    context_sentence_index_file = luigi.Parameter(default=None)
+    score_threhold = luigi.FloatParameter(default=0.3)
+    vocab_size = luigi.IntParameter(default=32000)
+    normalization_rule_name = luigi.Parameter(default="nmt_nfkc_cf")
+
+    def requires(self):
+        return GenerateDataSplits(
+            train_dataset_names=self.train_dataset_names,
+            train_source_paths=self.train_source_paths,
+            valid_dataset_names=self.valid_dataset_names,
+            valid_source_paths=self.valid_source_paths,
+            test_dataset_names=self.test_dataset_names,
+            test_source_paths=self.test_source_paths,
+        )
 
     def output(self):
         outputs = {}
@@ -273,7 +319,7 @@ class RunFairseqTraining(gokart.TaskOnKart):
     source_factor_type_num = luigi.IntParameter(default=2)
 
     def requires(self):
-        return GenerateConversationSplits(
+        return GenerateFairseqDataSplits(
             train_dataset_names=self.train_dataset_names,
             train_source_paths=self.train_source_paths,
             valid_dataset_names=self.valid_dataset_names,

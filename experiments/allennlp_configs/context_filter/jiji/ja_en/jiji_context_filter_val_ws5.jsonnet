@@ -8,6 +8,6 @@ local dataset_reader = create_dataset_reader('2-to-1',
                                              bert_name=bert_name,
                                              source_lang='ja',
                                              target_lang='en',
-                                             window_size=5)
+                                             window_size=5);
 
 create_configuration(dataset_reader, bert_name=bert_name)

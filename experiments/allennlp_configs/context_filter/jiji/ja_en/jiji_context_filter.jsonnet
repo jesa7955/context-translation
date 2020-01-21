@@ -4,4 +4,4 @@ local bert_name = "bert-base-japanese";
 
 local dataset_reader = create_dataset_reader('2-to-1', 'train', false, bert_name=bert_name, source_lang='ja', target_lang='en');
 
-create_configuration(dataset_reader, bert_name=bert_name, cuda_device=1, batch_size=56)
+create_configuration(dataset_reader, bert_name=bert_name, cuda_device=1, batch_size=52)

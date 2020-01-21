@@ -4,6 +4,7 @@ CONTEXT_INDICATOR=${3}
 START_ITER=${4}
 END_ITER=${5}
 CUDA_DEVICE=${6}
+TARGET_FILE=${7}
 CACHE="/home/litong/context_translation/resources/"
 SOURCE="/home/litong/context_translation/experiments/allennlp_configs/context_filter/jiji/${LANG_PAIR}/${MODEL_BASE}.jsonnet"
 VAL_SOURCE="/home/litong/context_translation/experiments/allennlp_configs/context_filter/jiji/${LANG_PAIR}/${MODEL_BASE}_val_w5.jsonnet"
@@ -19,12 +20,9 @@ do
     jsonnet ${SOURCE} | sed "s/\"context_sentence_index_file\": null/\"context_sentence_index_file\": \"${CONTEXT_INDICATOR}\"/g" | sed "s/\"null\"/null/g" > ${TRAIN_CONFIG}
     allennlp train -s ${TRAIN_DIR} --include-package context_nmt ${TRAIN_CONFIG}
     jsonnet ${VAL_SOURCE} > ${TRAIN_DIR}/config.json
-    for FILE in $(grep "pkl" ${TRAIN_CONFIG} | cut -d'"' -f 4)
-    do
-        allennlp predict --include-package context_nmt --output-file ${TEMP} --batch-size 1024 --cuda-device ${CUDA_DEVICE} \
-                         --use-dataset-reader --predictor context_sentence_filter --silent ${TRAIN_DIR} ${FILE}
-        cat ${TEMP} >> ${INDEXER_TARGET}
-    done
+    allennlp predict --include-package context_nmt --output-file ${TEMP} --batch-size 1024 --cuda-device ${CUDA_DEVICE} \
+                     --use-dataset-reader --predictor context_sentence_filter --silent ${TRAIN_DIR} ${TARGET_FILE}
+    cat ${TEMP} >> ${INDEXER_TARGET}
     rm ${TEMP}
     CONTEXT_INDICATOR=${INDEXER_TARGET}
 done
