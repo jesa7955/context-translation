@@ -39,7 +39,7 @@ function(dataset_reader,
   //train_data_path: '/home/litong/context_translation/resources/valid_0a06896723176aff827aac15a2e1ac94.pkl',
   //validation_data_path: '/home/litong/context_translation/resources/test_3c5cba7d2f64b7fb2d6b5013adc7a888.pkl',
   trainer: {
-    cuda_device: 0,
+    cuda_device: cuda_device,
     num_epochs: num_epochs,
     num_serialized_models_to_keep: 1,
     optimizer: {
