@@ -14,6 +14,7 @@ import luigi
 import pandas as pd
 import gokart
 import sentencepiece as spm
+from fairseq.models.transformer import TransformerModel
 
 from context_nmt.pipelines.jiji_dataset_merger import read_raw_jiji
 
@@ -24,8 +25,36 @@ CONCAT_TOKEN = "@@CONCAT@@"
 SPLIT_NAMES = ("train", "valid", "test")
 
 
+def train_sentencepiece_from_list(
+    sentences: Dict, model_path: str, normalization_rule_name: str
+):
+    def train_sentencepiece_from_file(train_data, vocab_size, model_path, lang):
+        model_prefix = os.path.splitext(model_path)[0]
+        character_coverage = 0.9995 if lang in SPECIAL_CHARACTER_COVERAGES_LANG else 1.0
+        spm.SentencePieceTrainer.train(
+            f"--input={train_data} --model_prefix={model_prefix} "
+            f"--character_coverage={character_coverage} "
+            f"--vocab_size={vocab_size} "
+            f"--normalization_rule_name={normalization_rule_name}"
+        )
+
+    for lang, (sents, vocab_size) in sentences.items():
+        with tempfile.NamedTemporaryFile(
+            mode="w", prefix=f"sentencepiece_train_{lang}_", suffix=".txt"
+        ) as tmp_f:
+            tmp_f.write("\n".join(sents))
+            tmp_f.flush()
+            train_sentencepiece_from_file(
+                train_data=tmp_f.name,
+                vocab_size=vocab_size,
+                model_path=model_path,
+                lang=lang,
+            )
+
+
 def read_context_index_file(file_path: str, key: str = "logits"):
     context_pairs = None
+    logger.info(f"Using {key} to filter context")
     if file_path and os.path.exists(file_path):
         context_pairs = collections.defaultdict(dict)
         with open(file_path, "r") as source:
@@ -82,6 +111,9 @@ class MergeMultipleDataset(gokart.TaskOnKart):
     split_name = luigi.Parameter()
     dataset_names = luigi.ListParameter()
     source_paths = luigi.ListParameter()
+    translation_model_name = luigi.Parameter(default=None)
+    translation_models = luigi.DictParameter(default={})
+    sentencepiece_models = luigi.DictParameter(default={})
 
     def requires(self):
         return {
@@ -90,12 +122,52 @@ class MergeMultipleDataset(gokart.TaskOnKart):
         }
 
     def output(self):
-        return self.make_target(f"{self.split_name}.pkl")
+        if self.translation_model_name:
+            return self.make_target(
+                f"{self.split_name}_{self.translation_model_name}.pkl"
+            )
+        else:
+            return self.make_target(f"{self.split_name}.pkl")
 
     def run(self):
         data = dict()
         for name in self.dataset_names:
             data.update(self.load(name))
+        if self.translation_model_name:
+            langs = list(self.translation_models.keys())
+            source_target_dict = {
+                lang: langs[1 - index] for index, lang in enumerate(langs)
+            }
+            translation_models = {}
+            for source, path in self.translation_models.items():
+                base_path, checkpoint_path = os.path.split(path)
+                model = TransformerModel.from_pretrained(
+                    base_path, checkpoint_file=checkpoint_path
+                )
+                model.to("cuda")
+                spm_processor = spm.SentencePieceProcessor()
+                spm_processor.load(self.sentencepiece_models[source])
+                translation_models[source] = (model, spm_processor)
+            for doc_id, doc in data.items():
+                for lang in translation_models.keys():
+                    doc[f"{lang}_translated"] = []
+                    model = translation_models[source_target_dict[lang]][0]
+                    tokenizer = translation_models[source_target_dict[lang]][1]
+                    detokenizer = translation_models[lang][1]
+                    for index, sent in enumerate(doc[source_target_dict[lang]]):
+                        translated = ""
+                        if sent:
+                            if sent == " ":
+                                translated = sent
+                            else:
+                                translated = detokenizer.decode_pieces(
+                                    model.translate(
+                                        " ".join(tokenizer.encode_as_pieces(str(sent)))
+                                    ).split()
+                                )
+                        logger.info(doc[lang][index])
+                        logger.info(translated)
+                        doc[f"{lang}_translated"].append(translated)
         self.dump(data)
 
 
@@ -151,6 +223,27 @@ class GenerateDataSplits(gokart.TaskOnKart):
             self.dump(value, key)
 
 
+class ReadTsvDataset(gokart.TaskOnKart):
+    task_namespace = "context_nmt"
+    dataset_names = luigi.ListParameter()
+    source_paths = luigi.ListParameter()
+    data_langs = luigi.ListParameter(default=["en", "ja"])
+
+    def output(self):
+        return self.make_target("_".join(self.dataset_names) + ".pkl")
+
+    def run(self):
+        data = {data_lang: [] for data_lang in self.data_langs}
+        lang1, lang2 = self.data_langs
+        for source_path in self.source_paths:
+            with open(source_path) as source:
+                for line in source:
+                    source, target = line.split("\t")
+                    data[lang1].append(source)
+                    data[lang2].append(target)
+        self.dump(data)
+
+
 class GenerateFairseqDataSplits(gokart.TaskOnKart):
     task_namespace = "context_nmt"
     context_pairs = None
@@ -167,19 +260,40 @@ class GenerateFairseqDataSplits(gokart.TaskOnKart):
     data_mode = luigi.Parameter(default="1-to-1")
     context_bias = luigi.IntParameter(default=1)
     context_sentence_index_file = luigi.Parameter(default=None)
+    context_metric_key = luigi.Parameter(default="logits")
     score_threhold = luigi.FloatParameter(default=0.3)
     vocab_size = luigi.IntParameter(default=32000)
     normalization_rule_name = luigi.Parameter(default="nmt_nfkc_cf")
+    data_format = luigi.Parameter(default="pkl")
+    lang_order = luigi.ListParameter(default=("en", "ja"))
+    sentence_level = luigi.BoolParameter()
 
     def requires(self):
-        return GenerateDataSplits(
-            train_dataset_names=self.train_dataset_names,
-            train_source_paths=self.train_source_paths,
-            valid_dataset_names=self.valid_dataset_names,
-            valid_source_paths=self.valid_source_paths,
-            test_dataset_names=self.test_dataset_names,
-            test_source_paths=self.test_source_paths,
-        )
+        if self.data_format == "pkl":
+            return GenerateDataSplits(
+                train_dataset_names=self.train_dataset_names,
+                train_source_paths=self.train_source_paths,
+                valid_dataset_names=self.valid_dataset_names,
+                valid_source_paths=self.valid_source_paths,
+                test_dataset_names=self.test_dataset_names,
+                test_source_paths=self.test_source_paths,
+            )
+        elif self.data_format == "tsv" and self.sentence_level:
+            requirements = {}
+            for split_name, (dataset_names, source_paths) in zip(
+                SPLIT_NAMES,
+                (
+                    (self.train_dataset_names, self.train_source_paths),
+                    (self.valid_dataset_names, self.valid_source_paths),
+                    (self.test_dataset_names, self.test_source_paths),
+                ),
+            ):
+                requirements[split_name] = ReadTsvDataset(
+                    dataset_names=dataset_names,
+                    source_paths=source_paths,
+                    data_langs=self.lang_order,
+                )
+            return requirements
 
     def output(self):
         outputs = {}
@@ -192,30 +306,52 @@ class GenerateFairseqDataSplits(gokart.TaskOnKart):
         return outputs
 
     def run(self):
-        self.context_pairs = read_context_index_file(self.context_sentence_index_file)
-        if self.context_pairs:
-            logger.info("We have some gold indicators!!!")
-        else:
-            logger.info("We have to generate our own context")
         data = {split_name: self.load(split_name) for split_name in SPLIT_NAMES}
         if not os.path.exists(self.sentencepiece_model_path):
-            train_en = list(
-                itertools.chain.from_iterable(
-                    (doc["en"] for doc in data["train"].values())
+            if self.sentence_level:
+                train_source = data["train"][self.source_lang]
+                train_target = data["train"][self.target_lang]
+            else:
+                train_source = list(
+                    itertools.chain.from_iterable(
+                        (doc[self.source_lang] for doc in data["train"].values())
+                    )
                 )
-            )
-            train_ja = list(
-                itertools.chain.from_iterable(
-                    (doc["ja"] for doc in data["train"].values())
+                train_target = list(
+                    itertools.chain.from_iterable(
+                        (doc[self.target_lang] for doc in data["train"].values())
+                    )
                 )
+            sentences = {
+                "_".join((self.source_lang, self.target_lang)): (
+                    train_source + train_target,
+                    self.vocab_size,
+                )
+            }
+            train_sentencepiece_from_list(
+                sentences, self.sentencepiece_model_path, self.normalization_rule_name,
             )
-            sentences = {"en_ja": (train_en + train_ja, self.vocab_size)}
-            self.train_sentencepiece_from_list(sentences, self.sentencepiece_model_path)
         self.processor.load(self.sentencepiece_model_path)
         for split_name in SPLIT_NAMES:
-            pairs = self.get_pairs(data[split_name])
+            if not self.sentence_level:
+                self.context_pairs = read_context_index_file(
+                    self.context_sentence_index_file, self.context_metric_key
+                )
+                if self.context_pairs:
+                    logger.info("We have some gold indicators!!!")
+                else:
+                    logger.info("We have to generate our own context")
+                pairs = self.get_pairs(data[split_name])
+            else:
+                pairs = self.get_sentence_level_pairs(data[split_name])
             for lang in (self.source_lang, self.target_lang):
                 self.dump("\n".join(pairs[lang]), f"{split_name}_{lang}")
+
+    def get_sentence_level_pairs(self, docs: Dict):
+        for lang, doc in docs.items():
+            for index, sent in enumerate(doc):
+                docs[lang][index] = " ".join(self.processor.encode_as_pieces(sent))
+        return docs
 
     def get_pairs(self, docs: Dict):
         pairs = {self.source_lang: [], self.target_lang: []}
@@ -261,32 +397,6 @@ class GenerateFairseqDataSplits(gokart.TaskOnKart):
                 pairs[self.target_lang].append(" ".join(target))
         return pairs
 
-    def train_sentencepiece_from_list(self, sentences: Dict, model_path: str):
-        def train_sentencepiece_from_file(train_data, vocab_size, model_path, lang):
-            model_prefix = os.path.splitext(model_path)[0]
-            character_coverage = (
-                0.9995 if lang in SPECIAL_CHARACTER_COVERAGES_LANG else 1.0
-            )
-            spm.SentencePieceTrainer.train(
-                f"--input={train_data} --model_prefix={model_prefix} "
-                f"--character_coverage={character_coverage} "
-                f"--vocab_size={vocab_size} "
-                f"--normalization_rule_name={self.normalization_rule_name}"
-            )
-
-        for lang, (sents, vocab_size) in sentences.items():
-            with tempfile.NamedTemporaryFile(
-                mode="w", prefix=f"sentencepiece_train_{lang}_", suffix=".txt"
-            ) as tmp_f:
-                tmp_f.write("\n".join(sents))
-                tmp_f.flush()
-                train_sentencepiece_from_file(
-                    train_data=tmp_f.name,
-                    vocab_size=vocab_size,
-                    model_path=model_path,
-                    lang=lang,
-                )
-
 
 class RunFairseqTraining(gokart.TaskOnKart):
     task_namespace = "context_nmt"
@@ -303,12 +413,15 @@ class RunFairseqTraining(gokart.TaskOnKart):
     data_mode = luigi.Parameter(default="1-to-1")
     context_bias = luigi.IntParameter(default=1)
     context_sentence_index_file = luigi.Parameter(default=None)
+    context_metric_key = luigi.Parameter(default="logits")
     score_threhold = luigi.FloatParameter(default=0.3)
     vocab_size = luigi.IntParameter(default=32000)
     normalization_rule_name = luigi.Parameter(default="nmt_nfkc_cf")
+    data_format = luigi.Parameter(default="pkl")
+    lang_order = luigi.ListParameter(default=("en", "ja"))
+    sentence_level = luigi.BoolParameter()
     # Model related parameters
     experiment_path = luigi.Parameter()
-    cuda_device = luigi.IntParameter()
     preprocess_workers = luigi.IntParameter(default=8)
     batch_size = luigi.IntParameter(default=1024)
     save_interval = luigi.IntParameter(default=8000)
@@ -332,9 +445,13 @@ class RunFairseqTraining(gokart.TaskOnKart):
             data_mode=self.data_mode,
             context_bias=self.context_bias,
             context_sentence_index_file=self.context_sentence_index_file,
+            context_metric_key=self.context_metric_key,
             score_threhold=self.score_threhold,
             vocab_size=self.vocab_size,
             normalization_rule_name=self.normalization_rule_name,
+            data_format=self.data_format,
+            lang_order=self.lang_order,
+            sentence_level=self.sentence_level,
         )
 
     def get_experiment_name(self):
@@ -352,6 +469,8 @@ class RunFairseqTraining(gokart.TaskOnKart):
                 )
             else:
                 name_components.append(f"context_bias_{self.context_bias}")
+        if self.context_metric_key != "logits":
+            name_components.append(self.context_metric_key)
         experiment_name = "_".join(name_components)
         return experiment_name
 
@@ -363,8 +482,6 @@ class RunFairseqTraining(gokart.TaskOnKart):
             split_name: os.path.splitext(self.input()[f"{split_name}_en"].path())[0]
             for split_name in SPLIT_NAMES
         }
-        enviroment_variables = copy.deepcopy(os.environ)
-        enviroment_variables["CUDA_VISIBLE_DEVICES"] = str(self.cuda_device)
         fairseq_data_path = (
             f"{self.experiment_path}/data-bin/{self.get_experiment_name()}"
         )
@@ -385,10 +502,7 @@ class RunFairseqTraining(gokart.TaskOnKart):
             preprocess_params += [f"--{split_name}pref", data_prefixs[split_name]]
         if not os.path.exists(fairseq_data_path):
             preprocess_return = subprocess.run(
-                " ".join(preprocess_params),
-                shell=True,
-                check=True,
-                env=enviroment_variables,
+                " ".join(preprocess_params), shell=True, check=True,
             )
 
         # Train Model
@@ -450,7 +564,5 @@ class RunFairseqTraining(gokart.TaskOnKart):
             f"{fairseq_checkpoint_path}/tensorboard-log",
         ]
         train_params += ["--patience", "10", "--reset-optimizer"]
-        train_return = subprocess.run(
-            " ".join(train_params), shell=True, check=True, env=enviroment_variables,
-        )
-        self.dump(" ".join(preprocess_params + train_params))
+        train_return = subprocess.run(" ".join(train_params), shell=True, check=True)
+        self.dump("\n".join(preprocess_params + train_params))

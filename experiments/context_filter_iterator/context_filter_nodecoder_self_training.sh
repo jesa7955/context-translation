@@ -6,8 +6,8 @@ CUDA_DEVICE=${5}
 TARGET_FILE=${6}
 BATCH_SIZE=${7}
 CACHE="/home/litong/context_translation/resources/"
-SOURCE="/home/litong/context_translation/experiments/allennlp_configs/context_filter/jiji/${LANG_PAIR}/jiji_context_filter_google.jsonnet"
-VAL_SOURCE="/home/litong/context_translation/experiments/allennlp_configs/context_filter/jiji/${LANG_PAIR}/jiji_context_filter_val_ws5.jsonnet"
+SOURCE="/home/litong/context_translation/experiments/allennlp_configs/context_filter/jiji/${LANG_PAIR}/jiji_context_filter_nodecoder.jsonnet"
+VAL_SOURCE="/home/litong/context_translation/experiments/allennlp_configs/context_filter/jiji/${LANG_PAIR}/jiji_context_filter_nodecoder_val_ws5.jsonnet"
 TARGET_BASE="/data/local/litong/context_nmt/"
 for ITER in $(seq ${START_ITER} ${END_ITER});
 do

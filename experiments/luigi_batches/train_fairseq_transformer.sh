@@ -9,7 +9,7 @@ python gokart_runner.py --local-scheduler --module context_nmt \
     --sentencepiece-model-path "/data/10/litong/NICT-MT/all-4-sentencepiece-en_ja-${1}.model" \
     --vocab-size ${1} \
     --source-lang ${2} --target-lang ${3} --data-mode ${4} \
-    --experiment-path ${5} --cuda-device ${6} \
+    --experiment-path ${5} \
     --preprocess-workers 8 --batch-size 4096 --save-interval 2000 \
-    --context-bias ${7} \
-    ${8}
+    --context-bias ${6} \
+    ${7} ${8}

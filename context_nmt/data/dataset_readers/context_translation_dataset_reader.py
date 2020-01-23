@@ -11,6 +11,7 @@ from collections import defaultdict
 
 import numpy as np
 import sentencepiece as spm
+from googletrans import Translator
 from allennlp.data.dataset_readers.dataset_reader import DatasetReader
 from allennlp.data.fields import LabelField, TextField, MetadataField
 from allennlp.data import Token, Instance
@@ -66,6 +67,7 @@ class ContextTranslationDatasetReader(DatasetReader):
         source_add_factors: bool = False,
         source_only: bool = False,
         context_sentence_index_file: str = None,
+        use_google_trans: bool = False,
         lazy: bool = False,
         cache_directory: str = None,
     ) -> None:
@@ -302,11 +304,31 @@ class ContextTranslationDatasetReader(DatasetReader):
                         )
                     if all_previous_sentences:
                         negative_index = random.sample(all_previous_sentences, 1)[0]
+                        negative_source_context = raw_documents[doc_id][
+                            self._source_lang
+                        ][negative_index]
+                        translated_lang = f"{self._target_lang}_translated"
+                        if translated_lang in raw_documents[doc_id]:
+                            negative_target_context = (
+                                raw_documents[doc_id][translated_lang][negative_index]
+                                if target_context
+                                else None
+                            )
+                            negative_target = raw_documents[doc_id][translated_lang][
+                                sent_id
+                            ]
+                        else:
+                            negative_target_context = (
+                                raw_documents[doc_id][self._target_lang][negative_index]
+                                if target_context
+                                else None
+                            )
+                            negative_target = target
                         yield self.text_to_instance(
-                            raw_documents[doc_id][self._source_lang][negative_index],
+                            negative_source_context,
                             source,
-                            target_context,
-                            target,
+                            negative_target_context,
+                            negative_target,
                             doc_id,
                             sent_id,
                             negative_index,

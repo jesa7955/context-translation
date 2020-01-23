@@ -3,8 +3,9 @@ BASE_PATH="/data/temp/litong/context_nmt/fairseq/"
 CUDA_DEVICE=${1}
 BATCH_SIZE=${2}
 BASE_SAVE_PATH=${3}
-RESULT_FILE=${4}
 DATA_BASE=${BASE_PATH}/data-bin/
+RESULT_FILE=${BASE_SAVE_PATH}/results.txt
+mkdir -p ${BASE_SAVE_PATH}
 for LANG_PAIR in $(echo "en_ja ja_en" | tr " " "\n")
 do
     echo ${LANG_PAIR} >> ${RESULT_FILE}

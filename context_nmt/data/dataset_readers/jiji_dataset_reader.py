@@ -46,6 +46,7 @@ class JijiDatasetReader(ContextTranslationDatasetReader):
         source_add_factors: bool = False,
         source_only: bool = False,
         context_sentence_index_file: str = None,
+        use_google_trans: bool = False,
         lazy: bool = False,
         cache_directory: str = None,
     ) -> None:
@@ -69,6 +70,7 @@ class JijiDatasetReader(ContextTranslationDatasetReader):
             source_add_factors=source_add_factors,
             source_only=source_only,
             context_sentence_index_file=context_sentence_index_file,
+            use_google_trans=use_google_trans,
             lazy=lazy,
             cache_directory=cache_directory,
         )
@@ -113,6 +115,9 @@ class JijiDatasetReader(ContextTranslationDatasetReader):
             elif extension == ".pkl":
                 with open(file_path, "rb") as source:
                     documents = pickle.load(source)
+                logger.info(
+                    f"All fields in a single document is {documents[list(documents)[0]].keys()}"
+                )
             else:
                 documents = {}
         return documents

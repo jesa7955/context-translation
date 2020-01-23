@@ -6,7 +6,8 @@ function(trans_mode,
          window_size=5,
          source_lang='en',
          target_lang='ja',
-         context_sentence_index_file=null) {
+         context_sentence_index_file=null,
+         use_google_trans=false) {
   type: 'jiji',
   window_size: window_size, 
   translation_data_mode: trans_mode,
@@ -32,4 +33,5 @@ function(trans_mode,
   },
   cache_directory: cache_directory,
   context_sentence_index_file: context_sentence_index_file,
+  use_google_trans: use_google_trans,
 }
