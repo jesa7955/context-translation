@@ -10,6 +10,8 @@ yapf = "*"
 pylint = "*"
 python-language-server = "*"
 black = "*"
+jupyter = "*"
+seaborn = "*"
 
 [packages]
 Sphinx = "*"
@@ -19,8 +21,9 @@ luigi = "*"
 gokart = "*"
 opustools-pkg = "*"
 sentencepiece = "*"
-fairseq = {git = "https://github.com/pytorch/fairseq.git"}
+fairseq = {git = "https://github.com/pytorch/fairseq.git",ref = "master"}
 sacrebleu = "*"
+mecab-python3 = "*"
 
 [requires]
 python_version = "3.7"

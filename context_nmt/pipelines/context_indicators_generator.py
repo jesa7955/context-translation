@@ -166,4 +166,4 @@ class GenerateContextIndicator(gokart.TaskOnKart):
                     if score_list:
                         result[score_name] = min(bleus, key=lambda x: x[1])[0]
                 results[doc_id][sent_id] = result
-        self.dump(results)
+        self.dump(dict(results))
