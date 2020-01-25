@@ -10,6 +10,7 @@ function(trans_mode,
          use_google_trans=false) {
   type: 'jiji',
   window_size: window_size, 
+  score_threshold: 0.3,
   translation_data_mode: trans_mode,
   classification_data_mode: class_mode,
   source_max_sequence_length: 512,

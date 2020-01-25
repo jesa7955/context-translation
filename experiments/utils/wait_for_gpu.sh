@@ -9,7 +9,7 @@ while [ $(nvidia-smi | grep python | wc -l) -eq 4 ]; do
     sleep 60
 done
 GPUS=$(nvidia-smi | grep python | cut -f 5 -d" ")
-for GPU in seq(0, 3); do
+for GPU in $(seq 0 3); do
     if [ $(echo ${GPUS} | grep -c ${GPU}) -eq 0 ]; then
         break
     fi

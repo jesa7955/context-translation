@@ -1,6 +1,7 @@
 TARGET_FILE="/home/litong/context_translation/resources/context_filter/jiji_context_filter_ja_en_0"
+TARGET_NAME="jiji_context_filter_ja_en_0"
 # Wait for the training of logits based model
-while [ $(ps ax | grep ${TARGET_FILE} | grep -c "fairseq-train") -lt 1 ]; do
+while [ $(ps ax | grep ${TARGET_NAME} | grep -c "fairseq-train") -lt 1 ]; do
     echo "waiting for the logits based model to run"
     sleep 60
 done
@@ -11,7 +12,7 @@ while [ $(nvidia-smi | grep python | wc -l) -eq 4 ]; do
 done
 # Find us a GPU
 GPUS=$(nvidia-smi | grep python | cut -f 5 -d" ")
-for GPU in seq(0, 3); do
+for GPU in $(seq 0 3); do
     if [ $(echo ${GPUS} | grep -c ${GPU}) -eq 0 ]; then
         break
     fi

@@ -106,6 +106,9 @@ class JijiDatasetReader(ContextTranslationDatasetReader):
                     documents[doc_id]["en"].append(en_sent.strip())
                     documents[doc_id]["ja"].append(ja_sent)
                     documents[doc_id]["pairs"].append((sent_id - 1, score))
+            for doc in documents.values():
+                doc["en"].append(" ")
+                doc["ja"].append(" ")
         else:
             extension = os.path.splitext(file_path)[1]
             logger.info(f"Input file is a {extension} file")

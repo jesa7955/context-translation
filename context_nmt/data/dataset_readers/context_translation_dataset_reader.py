@@ -180,9 +180,6 @@ class ContextTranslationDatasetReader(DatasetReader):
     @overrides
     def _read(self, file_path):
         docs = self._read_documents_from_raw_data(file_path)
-        for doc in docs.values():
-            doc["en"].append(" ")
-            doc["ja"].append(" ")
         logger.info(f"There are {len(docs)} documents")
         parallel_docs = {
             doc_id: self._get_parallel_document(doc_id, doc)

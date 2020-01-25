@@ -8,6 +8,7 @@ from context_nmt.pipelines.conversation_dataset_merger import (
     MergeMultipleDataset,
     GenerateDataSplits,
 )
+from context_nmt.pipelines.context_indicators_generator import GenerateContextIndicator
 from context_nmt.fairseq.factored_transformer import FactoredTransformerModel
 from context_nmt.fairseq.factored_translation import FactoredTranslationTask
 from context_nmt.predictors.context_sentence_filter import (

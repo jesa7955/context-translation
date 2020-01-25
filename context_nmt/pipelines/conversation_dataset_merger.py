@@ -6,10 +6,9 @@ import json
 import itertools
 import os
 import tempfile
-import copy
 import subprocess
-import itertools
 
+import tqdm
 import luigi
 import pandas as pd
 import gokart
@@ -54,8 +53,8 @@ def train_sentencepiece_from_list(
 
 def read_context_index_file(file_path: str, key: str = "logits"):
     context_pairs = None
-    logger.info(f"Using {key} to filter context")
     if file_path and os.path.exists(file_path):
+        logger.info(f"Using {key} to filter context")
         context_pairs = collections.defaultdict(dict)
         with open(file_path, "r") as source:
             for line in source:
@@ -74,9 +73,17 @@ class MergeConversationFiles(gokart.TaskOnKart):
     task_namespace = "context_nmt"
     dataset_name = luigi.Parameter()
     source_path = luigi.Parameter()
+    translation_model_name = luigi.Parameter(default=None)
+    translation_models = luigi.DictParameter(default={})
+    sentencepiece_models = luigi.DictParameter(default={})
 
     def output(self):
-        return self.make_target(f"{self.dataset_name}_merged.pkl")
+        if self.translation_model_name:
+            return self.make_target(
+                f"{self.dataset_name}_{self.translation_model_name}_merged.pkl"
+            )
+        else:
+            return self.make_target(f"{self.dataset_name}_merged.pkl")
 
     def run(self):
         def load_doc(doc: List, doc_id: str):
@@ -100,39 +107,11 @@ class MergeConversationFiles(gokart.TaskOnKart):
                     doc_id = os.path.splitext(file_path)[0].split("/")[-1]
                     with open(file_path) as source:
                         load_doc(json.load(source), doc_id)
-        for doc_id, doc in docs.items():
+        for _, doc in docs.items():
             doc["en"].append(" ")
             doc["ja"].append(" ")
-        self.dump(dict(docs))
 
-
-class MergeMultipleDataset(gokart.TaskOnKart):
-    task_namespace = "context_nmt"
-    split_name = luigi.Parameter()
-    dataset_names = luigi.ListParameter()
-    source_paths = luigi.ListParameter()
-    translation_model_name = luigi.Parameter(default=None)
-    translation_models = luigi.DictParameter(default={})
-    sentencepiece_models = luigi.DictParameter(default={})
-
-    def requires(self):
-        return {
-            name: MergeConversationFiles(dataset_name=name, source_path=path)
-            for name, path in zip(self.dataset_names, self.source_paths)
-        }
-
-    def output(self):
-        if self.translation_model_name:
-            return self.make_target(
-                f"{self.split_name}_{self.translation_model_name}.pkl"
-            )
-        else:
-            return self.make_target(f"{self.split_name}.pkl")
-
-    def run(self):
-        data = dict()
-        for name in self.dataset_names:
-            data.update(self.load(name))
+        # Add translated source to the data
         if self.translation_model_name:
             langs = list(self.translation_models.keys())
             source_target_dict = {
@@ -148,26 +127,66 @@ class MergeMultipleDataset(gokart.TaskOnKart):
                 spm_processor = spm.SentencePieceProcessor()
                 spm_processor.load(self.sentencepiece_models[source])
                 translation_models[source] = (model, spm_processor)
-            for doc_id, doc in data.items():
+            for doc_id, doc in tqdm.tqdm(docs.items(), total=len(docs)):
                 for lang in translation_models.keys():
-                    doc[f"{lang}_translated"] = []
                     model = translation_models[source_target_dict[lang]][0]
                     tokenizer = translation_models[source_target_dict[lang]][1]
                     detokenizer = translation_models[lang][1]
+                    sources = []
+                    no_translation = {}
                     for index, sent in enumerate(doc[source_target_dict[lang]]):
-                        translated = ""
-                        if sent:
-                            if sent == " ":
-                                translated = sent
-                            else:
-                                translated = detokenizer.decode_pieces(
-                                    model.translate(
-                                        " ".join(tokenizer.encode_as_pieces(str(sent)))
-                                    ).split()
-                                )
-                        logger.info(doc[lang][index])
-                        logger.info(translated)
-                        doc[f"{lang}_translated"].append(translated)
+                        if not sent or sent == " ":
+                            no_translation[index] = sent
+                        else:
+                            sources.append(sent)
+                    targets = [
+                        detokenizer.decode_pieces(target.split())
+                        for target in model.translate(
+                            [
+                                " ".join(tokenizer.encode_as_pieces(source))
+                                for source in sources
+                            ]
+                        )
+                    ]
+                    for sent_id, sent in no_translation.items():
+                        targets.insert(sent_id, sent)
+                    doc[f"{lang}_translated"] = targets
+        self.dump(dict(docs))
+
+
+class MergeMultipleDataset(gokart.TaskOnKart):
+    task_namespace = "context_nmt"
+    split_name = luigi.Parameter()
+    dataset_names = luigi.ListParameter()
+    source_paths = luigi.ListParameter()
+    translation_model_name = luigi.Parameter(default=None)
+    translation_models = luigi.DictParameter(default={})
+    sentencepiece_models = luigi.DictParameter(default={})
+
+    def requires(self):
+        return {
+            name: MergeConversationFiles(
+                dataset_name=name,
+                source_path=path,
+                translation_model_name=self.translation_model_name,
+                translation_models=self.translation_models,
+                sentencepiece_models=self.sentencepiece_models,
+            )
+            for name, path in zip(self.dataset_names, self.source_paths)
+        }
+
+    def output(self):
+        if self.translation_model_name:
+            return self.make_target(
+                f"{self.split_name}_{self.translation_model_name}.pkl"
+            )
+        else:
+            return self.make_target(f"{self.split_name}.pkl")
+
+    def run(self):
+        data = dict()
+        for name in self.dataset_names:
+            data.update(self.load(name))
         self.dump(data)
 
 
@@ -371,21 +390,24 @@ class GenerateFairseqDataSplits(gokart.TaskOnKart):
                 source_context = None
                 if "2-to-1" in str(self.data_mode):
                     if self.context_pairs is None:
-                        context_sent_index = (
-                            -1
-                            if sent_id < self.context_bias
-                            else sent_id - self.context_bias
-                        )
                         if self.data_mode == "2-to-1":
-                            while (
-                                context_sent_index >= 0
-                                and not docs[doc_id][self.source_lang][
-                                    context_sent_index
+                            available_index = [
+                                index
+                                for index in range(0, sent_id)
+                                if doc[self.source_lang][index]
+                            ]
+                            if len(available_index) < self.context_bias:
+                                context_sent_index = -1
+                            else:
+                                context_sent_index = available_index[
+                                    -int(self.context_bias)
                                 ]
-                            ):
-                                context_sent_index -= 1
                         else:
-                            if context_sent_index not in parallel_doc:
+                            context_sent_index = min(sent_id - self.context_bias, -1)
+                            if (
+                                context_sent_index not in parallel_doc
+                                and context_sent_index != -1
+                            ):
                                 continue
                     else:
                         context_sent_index = self.context_pairs[doc_id][sent_id][0]
