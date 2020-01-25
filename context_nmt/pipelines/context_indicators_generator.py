@@ -85,6 +85,9 @@ class GenerateContextIndicator(gokart.TaskOnKart):
                     index for index in range(0, sent_id) if doc[self.source_lang][index]
                 ]
                 bleus, losses, nll_losses = [], [], []
+                # context_bias is the parameter which the model is trained with.
+                # context_sent_index is the index of the actual used contextual
+                # sentence.
                 for context_bias, model in translation_models.items():
                     context_sent_index = None
                     if context_bias != -1:
@@ -107,6 +110,7 @@ class GenerateContextIndicator(gokart.TaskOnKart):
                         bleus.append(
                             (
                                 context_sent_index,
+                                context_bias,
                                 -sacrebleu.corpus_bleu(
                                     tokenizer.decode_pieces(
                                         model.translate(" ".join(source)).split()
@@ -157,13 +161,17 @@ class GenerateContextIndicator(gokart.TaskOnKart):
                         _, _, report = task.valid_step(
                             sample, model.models[0], task.build_criterion(args)
                         )
-                        losses.append((context_sent_index, report["loss"]))
-                        nll_losses.append((context_sent_index, report["nll_loss"]))
+                        losses.append(
+                            (context_sent_index, context_bias, report["loss"])
+                        )
+                        nll_losses.append(
+                            (context_sent_index, context_bias, report["nll_loss"])
+                        )
                 result = {}
                 for score_name, score_list in zip(
                     ("bleu", "loss", "nll_loss"), (bleus, losses, nll_losses)
                 ):
                     if score_list:
-                        result[score_name] = min(bleus, key=lambda x: x[1])[0]
+                        result[score_name] = score_list
                 results[doc_id][sent_id] = result
         self.dump(dict(results))
