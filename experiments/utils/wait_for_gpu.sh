@@ -1,5 +1,5 @@
-READY_FILE="resources/jiji_context_filter_nodecoder_ja_en_0_ready"
-TARGET_FILE="/home/litong/context_translation/resources/context_filter/jiji_context_filter_ja_en_0"
+READY_FILE="resources/jiji_context_filter_cleaned_limited_ja_en_0_ready"
+TARGET_FILE="/home/litong/context_translation/resources/context_filter/jiji_context_filter_cleaned_limited_ja_en_0"
 while [ ! -e ${READY_FILE} ]; do
     echo "waiting for indicators"
     sleep 60
@@ -15,4 +15,4 @@ for GPU in $(seq 0 3); do
     fi
 done
 CUDA_VISIBLE_DEVICES=${GPU} bash experiments/luigi_batches/train_fairseq_transformer.sh 32000 ja en 2-to-1 \
-    /data/temp/litong/context_nmt/fairseq 1 "--context-sentence-index-file ${TARGET_FILE}"
+    /data/temp/litong/context_nmt/fairseq_temp 1 "--context-sentence-index-file ${TARGET_FILE}"

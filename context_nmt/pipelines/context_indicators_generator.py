@@ -28,6 +28,8 @@ class GenerateContextIndicator(gokart.TaskOnKart):
     target_lang = luigi.Parameter()
     context_aware_translation_models = luigi.DictParameter()
     context_aware_sentencepiece_model = luigi.Parameter()
+    max_source_positions = luigi.IntParameter(default=128)
+    max_target_positions = luigi.IntParameter(default=128)
     sentence_translation_model_name = luigi.Parameter(default=None)
     sentence_translation_models = luigi.DictParameter(default={})
     sentence_sentencepiece_models = luigi.DictParameter(default={})
@@ -98,13 +100,15 @@ class GenerateContextIndicator(gokart.TaskOnKart):
                         source_context = tokenizer.encode_as_pieces(
                             docs[doc_id][self.source_lang][context_sent_index]
                         )
-                        source = source_context + [CONCAT_TOKEN] + source
-                    args = model.args
-                    task = model.task
+                        real_source = source_context + [CONCAT_TOKEN] + source
+                    else:
+                        real_source = source
                     if (
-                        len(source) <= args.max_source_positions
-                        and len(target) <= args.max_target_positions
+                        len(real_source) <= self.max_source_positions
+                        and len(target) < self.max_target_positions
                     ):
+                        args = model.args
+                        task = model.task
                         # Compute BLEU score
                         # Make the BLEU negative to easy the results computaion
                         bleus.append(
@@ -113,7 +117,7 @@ class GenerateContextIndicator(gokart.TaskOnKart):
                                 context_bias,
                                 -sacrebleu.corpus_bleu(
                                     tokenizer.decode_pieces(
-                                        model.translate(" ".join(source)).split()
+                                        model.translate(" ".join(real_source)).split()
                                     ),
                                     tokenizer.decode_pieces(target),
                                 ).score,
@@ -122,7 +126,7 @@ class GenerateContextIndicator(gokart.TaskOnKart):
                         # Compute loss
                         src_tokens = (
                             model.src_dict.encode_line(
-                                " ".join(source), lambda x: x.split()
+                                " ".join(real_source), lambda x: x.split()
                             )
                             .long()
                             .unsqueeze(0)
@@ -144,8 +148,8 @@ class GenerateContextIndicator(gokart.TaskOnKart):
                             tgt_lengths,
                             left_pad_source=args.left_pad_source,
                             left_pad_target=args.left_pad_target,
-                            max_source_positions=args.max_source_positions,
-                            max_target_positions=args.max_target_positions,
+                            max_source_positions=self.max_source_positions,
+                            max_target_positions=self.max_target_positions,
                         )
                         sample = temp_dataset.collater(list(temp_dataset))
                         sample["net_input"]["src_tokens"] = sample["net_input"][
