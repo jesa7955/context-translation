@@ -1,0 +1,150 @@
+en_ja
+------------------------------
+Model -> jiji_onto_ami_conver_train_2-to-1_en_ja_context_bias_1
+	DATA -> Previous_1: 	valid: 14.82	test: 15.33
+	DATA -> Previous_2: 	valid: 14.99	test: 15.08
+	DATA -> Previous_3: 	valid: 14.70	test: 15.00
+	DATA -> Previous_4: 	valid: 14.76	test: 15.18
+	DATA -> Previous_5: 	valid: 14.61	test: 14.92
+Model -> jiji_onto_ami_conver_train_2-to-1_en_ja_context_bias_2
+	DATA -> Previous_1: 	valid: 14.98	test: 15.41
+	DATA -> Previous_2: 	valid: 14.94	test: 15.20
+	DATA -> Previous_3: 	valid: 15.05	test: 15.45
+	DATA -> Previous_4: 	valid: 14.85	test: 15.41
+	DATA -> Previous_5: 	valid: 14.88	test: 15.01
+Model -> jiji_onto_ami_conver_train_2-to-1_en_ja_context_bias_3
+	DATA -> Previous_1: 	valid: 14.58	test: 15.31
+	DATA -> Previous_2: 	valid: 14.90	test: 15.40
+	DATA -> Previous_3: 	valid: 15.01	test: 14.98
+	DATA -> Previous_4: 	valid: 14.86	test: 15.22
+	DATA -> Previous_5: 	valid: 14.74	test: 14.94
+Model -> jiji_onto_ami_conver_train_2-to-1_en_ja_context_bias_4
+	DATA -> Previous_1: 	valid: 14.99	test: 15.31
+	DATA -> Previous_2: 	valid: 14.85	test: 15.53
+	DATA -> Previous_3: 	valid: 15.20	test: 15.37
+	DATA -> Previous_4: 	valid: 14.69	test: 15.38
+	DATA -> Previous_5: 	valid: 14.86	test: 15.24
+Model -> jiji_onto_ami_conver_train_2-to-1_en_ja_context_bias_5
+	DATA -> Previous_1: 	valid: 15.78	test: 15.46
+	DATA -> Previous_2: 	valid: 15.51	test: 15.44
+	DATA -> Previous_3: 	valid: 15.60	test: 15.43
+	DATA -> Previous_4: 	valid: 15.26	test: 15.50
+	DATA -> Previous_5: 	valid: 15.46	test: 15.43
+Model -> jiji_onto_ami_conver_train_2-to-1_en_ja_filtered_jiji_context_filter_cleaned_limited_en_ja_0
+	DATA -> Previous_1: 	valid: 14.86	test: 15.52
+	DATA -> Previous_2: 	valid: 14.67	test: 15.09
+	DATA -> Previous_3: 	valid: 15.18	test: 15.28
+	DATA -> Previous_4: 	valid: 14.89	test: 15.30
+	DATA -> Previous_5: 	valid: 14.71	test: 14.98
+Model -> jiji_onto_ami_conver_train_2-to-1_en_ja_filtered_jiji_context_filter_en_ja_0
+	DATA -> Previous_1: 	valid: 15.12	test: 15.48
+	DATA -> Previous_2: 	valid: 14.79	test: 15.51
+	DATA -> Previous_3: 	valid: 14.85	test: 15.25
+	DATA -> Previous_4: 	valid: 14.75	test: 15.18
+	DATA -> Previous_5: 	valid: 14.47	test: 15.10
+Model -> jiji_onto_ami_conver_train_2-to-1_en_ja_filtered_jiji_context_filter_en_ja_1
+	DATA -> Previous_1: 	valid: 8.60	test: 8.56
+	DATA -> Previous_2: 	valid: 8.94	test: 9.29
+	DATA -> Previous_3: 	valid: 8.84	test: 9.06
+	DATA -> Previous_4: 	valid: 9.29	test: 9.40
+	DATA -> Previous_5: 	valid: 9.38	test: 9.46
+Model -> jiji_onto_ami_conver_train_2-to-1_en_ja_filtered_jiji_context_filter_nodecoder_en_ja_0
+	DATA -> Previous_1: 	valid: 14.66	test: 15.31
+	DATA -> Previous_2: 	valid: 14.99	test: 15.01
+	DATA -> Previous_3: 	valid: 14.99	test: 14.68
+	DATA -> Previous_4: 	valid: 14.58	test: 15.01
+	DATA -> Previous_5: 	valid: 14.72	test: 14.95
+Model -> jiji_onto_ami_conver_train_2-to-1_en_ja_filtered_jiji_context_filter_translated_full_en_ja_0
+	DATA -> Previous_1: 	valid: 14.84	test: 15.57
+	DATA -> Previous_2: 	valid: 15.10	test: 15.39
+	DATA -> Previous_3: 	valid: 14.98	test: 15.16
+	DATA -> Previous_4: 	valid: 14.91	test: 15.19
+	DATA -> Previous_5: 	valid: 14.60	test: 15.19
+Model -> jiji_onto_ami_conver_train_2-to-1_en_ja_filtered_jiji_context_filter_translated_limited_en_ja_0
+	DATA -> Previous_1: 	valid: 15.38	test: 15.76
+	DATA -> Previous_2: 	valid: 15.14	test: 15.55
+	DATA -> Previous_3: 	valid: 15.51	test: 15.14
+	DATA -> Previous_4: 	valid: 15.17	test: 15.22
+	DATA -> Previous_5: 	valid: 15.55	test: 15.14
+
+ja_en
+------------------------------
+Model -> jiji_onto_ami_conver_train_2-to-1_ja_en_context_bias_1
+	DATA -> Previous_1: 	valid: 17.13	test: 17.21
+	DATA -> Previous_2: 	valid: 16.91	test: 17.00
+	DATA -> Previous_3: 	valid: 16.83	test: 17.07
+	DATA -> Previous_4: 	valid: 16.94	test: 17.11
+	DATA -> Previous_5: 	valid: 16.89	test: 16.92
+Model -> jiji_onto_ami_conver_train_2-to-1_ja_en_context_bias_2
+	DATA -> Previous_1: 	valid: 17.69	test: 17.21
+	DATA -> Previous_2: 	valid: 17.31	test: 17.46
+	DATA -> Previous_3: 	valid: 17.55	test: 17.31
+	DATA -> Previous_4: 	valid: 17.25	test: 17.24
+	DATA -> Previous_5: 	valid: 17.29	test: 17.47
+Model -> jiji_onto_ami_conver_train_2-to-1_ja_en_context_bias_3
+	DATA -> Previous_1: 	valid: 17.06	test: 16.99
+	DATA -> Previous_2: 	valid: 16.93	test: 16.98
+	DATA -> Previous_3: 	valid: 17.14	test: 16.89
+	DATA -> Previous_4: 	valid: 16.91	test: 16.86
+	DATA -> Previous_5: 	valid: 16.96	test: 16.98
+Model -> jiji_onto_ami_conver_train_2-to-1_ja_en_context_bias_4
+	DATA -> Previous_1: 	valid: 17.19	test: 17.30
+	DATA -> Previous_2: 	valid: 17.48	test: 17.57
+	DATA -> Previous_3: 	valid: 17.76	test: 17.13
+	DATA -> Previous_4: 	valid: 17.51	test: 17.46
+	DATA -> Previous_5: 	valid: 17.27	test: 17.41
+Model -> jiji_onto_ami_conver_train_2-to-1_ja_en_context_bias_5
+	DATA -> Previous_1: 	valid: 16.67	test: 17.31
+	DATA -> Previous_2: 	valid: 17.05	test: 17.18
+	DATA -> Previous_3: 	valid: 16.99	test: 17.24
+	DATA -> Previous_4: 	valid: 17.12	test: 17.04
+	DATA -> Previous_5: 	valid: 16.87	test: 17.15
+Model -> jiji_onto_ami_conver_train_2-to-1_ja_en_filtered_full_jiji_context_filter_ja_en_0
+	DATA -> Previous_1: 	valid: 17.05	test: 17.23
+	DATA -> Previous_2: 	valid: 17.05	test: 17.07
+	DATA -> Previous_3: 	valid: 16.94	test: 16.74
+	DATA -> Previous_4: 	valid: 16.59	test: 16.75
+	DATA -> Previous_5: 	valid: 16.90	test: 16.79
+Model -> jiji_onto_ami_conver_train_2-to-1_ja_en_filtered_full_jiji_context_filter_ja_en_1
+	DATA -> Previous_1: 	valid: 12.89	test: 12.95
+	DATA -> Previous_2: 	valid: 12.72	test: 12.65
+	DATA -> Previous_3: 	valid: 13.09	test: 13.40
+	DATA -> Previous_4: 	valid: 12.92	test: 13.33
+	DATA -> Previous_5: 	valid: 13.48	test: 13.76
+Model -> jiji_onto_ami_conver_train_2-to-1_ja_en_filtered_full_jiji_context_filter_ja_en_2
+	DATA -> Previous_1: 	valid: 8.07	test: 8.24
+	DATA -> Previous_2: 	valid: 8.40	test: 8.54
+	DATA -> Previous_3: 	valid: 8.44	test: 8.42
+	DATA -> Previous_4: 	valid: 8.61	test: 8.71
+	DATA -> Previous_5: 	valid: 8.91	test: 9.08
+Model -> jiji_onto_ami_conver_train_2-to-1_ja_en_filtered_jiji_context_filter_cleaned_limited_ja_en_0
+	DATA -> Previous_1: 	valid: 17.16	test: 16.82
+	DATA -> Previous_2: 	valid: 17.24	test: 17.00
+	DATA -> Previous_3: 	valid: 16.93	test: 16.83
+	DATA -> Previous_4: 	valid: 17.14	test: 17.10
+	DATA -> Previous_5: 	valid: 16.77	test: 16.97
+Model -> jiji_onto_ami_conver_train_2-to-1_ja_en_filtered_jiji_context_filter_ja_en_0
+	DATA -> Previous_1: 	valid: 17.23	test: 17.20
+	DATA -> Previous_2: 	valid: 16.92	test: 17.11
+	DATA -> Previous_3: 	valid: 17.19	test: 17.01
+	DATA -> Previous_4: 	valid: 17.06	test: 17.26
+	DATA -> Previous_5: 	valid: 16.97	test: 17.30
+Model -> jiji_onto_ami_conver_train_2-to-1_ja_en_filtered_jiji_context_filter_nodecoder_ja_en_0
+	DATA -> Previous_1: 	valid: 17.69	test: 18.03
+	DATA -> Previous_2: 	valid: 17.62	test: 18.20
+	DATA -> Previous_3: 	valid: 18.14	test: 17.88
+	DATA -> Previous_4: 	valid: 17.87	test: 17.89
+	DATA -> Previous_5: 	valid: 17.73	test: 18.13
+Model -> jiji_onto_ami_conver_train_2-to-1_ja_en_filtered_jiji_context_filter_translated_full_ja_en_0
+	DATA -> Previous_1: 	valid: 17.29	test: 17.50
+	DATA -> Previous_2: 	valid: 17.18	test: 17.72
+	DATA -> Previous_3: 	valid: 17.51	test: 17.90
+	DATA -> Previous_4: 	valid: 17.15	test: 17.59
+	DATA -> Previous_5: 	valid: 17.07	test: 17.94
+Model -> jiji_onto_ami_conver_train_2-to-1_ja_en_filtered_jiji_context_filter_translated_limited_ja_en_0
+	DATA -> Previous_1: 	valid: 17.09	test: 17.13
+	DATA -> Previous_2: 	valid: 17.03	test: 17.40
+	DATA -> Previous_3: 	valid: 17.21	test: 17.32
+	DATA -> Previous_4: 	valid: 16.78	test: 17.11
+	DATA -> Previous_5: 	valid: 16.80	test: 17.26
+

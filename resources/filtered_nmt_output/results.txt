@@ -1,0 +1,34 @@
+en_ja
+------------------------------
+jiji_onto_ami_conver_train_2-to-1_en_ja_filtered_jiji_context_filter_cleaned_limited_en_ja_0
+	valid: 15.00	test: 15.26
+jiji_onto_ami_conver_train_2-to-1_en_ja_filtered_jiji_context_filter_en_ja_0
+	valid: 14.94	test: 15.52
+jiji_onto_ami_conver_train_2-to-1_en_ja_filtered_jiji_context_filter_en_ja_1
+	valid: 14.66	test: 15.56
+jiji_onto_ami_conver_train_2-to-1_en_ja_filtered_jiji_context_filter_nodecoder_en_ja_0
+	valid: 14.73	test: 14.95
+jiji_onto_ami_conver_train_2-to-1_en_ja_filtered_jiji_context_filter_translated_full_en_ja_0
+	valid: 14.83	test: 15.39
+jiji_onto_ami_conver_train_2-to-1_en_ja_filtered_jiji_context_filter_translated_limited_en_ja_0
+	valid: 15.47	test: 15.58
+
+ja_en
+------------------------------
+jiji_onto_ami_conver_train_2-to-1_ja_en_filtered_full_jiji_context_filter_ja_en_0
+	valid: 17.07	test: 16.89
+jiji_onto_ami_conver_train_2-to-1_ja_en_filtered_full_jiji_context_filter_ja_en_1
+	valid: 16.06	test: 16.14
+jiji_onto_ami_conver_train_2-to-1_ja_en_filtered_full_jiji_context_filter_ja_en_2
+	valid: 16.78	test: 16.77
+jiji_onto_ami_conver_train_2-to-1_ja_en_filtered_jiji_context_filter_cleaned_limited_ja_en_0
+	valid: 16.93	test: 17.03
+jiji_onto_ami_conver_train_2-to-1_ja_en_filtered_jiji_context_filter_ja_en_0
+	valid: 17.10	test: 17.33
+jiji_onto_ami_conver_train_2-to-1_ja_en_filtered_jiji_context_filter_nodecoder_ja_en_0
+	valid: 17.40	test: 17.97
+jiji_onto_ami_conver_train_2-to-1_ja_en_filtered_jiji_context_filter_translated_full_ja_en_0
+	valid: 16.87	test: 17.56
+jiji_onto_ami_conver_train_2-to-1_ja_en_filtered_jiji_context_filter_translated_limited_ja_en_0
+	valid: 17.01	test: 17.05
+

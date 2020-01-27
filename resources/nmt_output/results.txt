@@ -1,0 +1,30 @@
+en_ja
+------------------------------
+jiji_onto_ami_conver_train_1-to-1_en_ja
+	valid: 15.11	test: 14.65
+jiji_onto_ami_conver_train_2-to-1_en_ja_context_bias_1
+	valid: 14.82	test: 15.33
+jiji_onto_ami_conver_train_2-to-1_en_ja_context_bias_2
+	valid: 14.94	test: 15.20
+jiji_onto_ami_conver_train_2-to-1_en_ja_context_bias_3
+	valid: 15.01	test: 14.98
+jiji_onto_ami_conver_train_2-to-1_en_ja_context_bias_4
+	valid: 14.69	test: 15.38
+jiji_onto_ami_conver_train_2-to-1_en_ja_context_bias_5
+	valid: 15.46	test: 15.43
+
+ja_en
+------------------------------
+jiji_onto_ami_conver_train_1-to-1_ja_en
+	valid: 16.90	test: 17.10
+jiji_onto_ami_conver_train_2-to-1_ja_en_context_bias_1
+	valid: 17.13	test: 17.21
+jiji_onto_ami_conver_train_2-to-1_ja_en_context_bias_2
+	valid: 17.31	test: 17.46
+jiji_onto_ami_conver_train_2-to-1_ja_en_context_bias_3
+	valid: 17.14	test: 16.89
+jiji_onto_ami_conver_train_2-to-1_ja_en_context_bias_4
+	valid: 17.51	test: 17.46
+jiji_onto_ami_conver_train_2-to-1_ja_en_context_bias_5
+	valid: 16.73	test: 17.15
+
