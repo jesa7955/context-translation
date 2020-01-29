@@ -50,6 +50,7 @@ function(dataset_reader,
       lr: 5e-5,
       parameter_groups: [[
         [
+          'target_embedder.weight',
           'decoder_cell.weight_ih',
           'decoder_cell.bias_ih',
           'decoder_cell.weight_hh',
