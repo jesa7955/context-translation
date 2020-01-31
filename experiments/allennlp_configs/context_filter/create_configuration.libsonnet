@@ -48,18 +48,18 @@ function(dataset_reader,
     optimizer: {
       type: 'adamw',
       lr: 5e-5,
-      parameter_groups: [[
-        [
-          'target_embedder.weight',
-          'decoder_cell.weight_ih',
-          'decoder_cell.bias_ih',
-          'decoder_cell.weight_hh',
-          'decoder_cell.bias_hh',
-          'output_projection_layer.weight',
-          'output_projection_layer.bias',
-        ],
-        { lr: 0.001 },
-      ]],
+      //parameter_groups: [[
+      //  [
+      //    'target_embedder.weight',
+      //    'decoder_cell.weight_ih',
+      //    'decoder_cell.bias_ih',
+      //    'decoder_cell.weight_hh',
+      //    'decoder_cell.bias_hh',
+      //    'output_projection_layer.weight',
+      //    'output_projection_layer.bias',
+      //  ],
+      //  { lr: 0.001 },
+      //]],
     },
     learning_rate_scheduler: {
       type: 'slanted_triangular',

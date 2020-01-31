@@ -68,6 +68,8 @@ class GenerateContextIndicator(gokart.TaskOnKart):
                 .half()
                 .cuda()
             )
+            model.args.max_source_positions = self.max_source_positions
+            model.args.max_target_positions = self.max_target_positions
             translation_models[int(bias)] = model
         results = collections.defaultdict(dict)
         for doc_id, doc in tqdm.tqdm(docs.items(), total=len(docs)):
@@ -103,74 +105,68 @@ class GenerateContextIndicator(gokart.TaskOnKart):
                         real_source = source_context + [CONCAT_TOKEN] + source
                     else:
                         real_source = source
-                    if (
-                        len(real_source) <= self.max_source_positions
-                        and len(target) < self.max_target_positions
-                    ):
-                        args = model.args
-                        task = model.task
-                        # Compute BLEU score
-                        # Make the BLEU negative to easy the results computaion
-                        bleus.append(
-                            (
-                                context_sent_index,
-                                context_bias,
-                                -sacrebleu.corpus_bleu(
-                                    tokenizer.decode_pieces(
-                                        model.translate(" ".join(real_source)).split()
-                                    ),
-                                    tokenizer.decode_pieces(target),
-                                ).score,
-                            )
+                    args = model.args
+                    task = model.task
+                    # Compute BLEU score
+                    # Make the BLEU negative to easy the results computaion
+                    bleus.append(
+                        (
+                            context_sent_index,
+                            context_bias,
+                            -sacrebleu.corpus_bleu(
+                                tokenizer.decode_pieces(
+                                    model.translate(" ".join(real_source)).split()
+                                ),
+                                tokenizer.decode_pieces(target),
+                            ).score,
                         )
-                        # Compute loss
-                        src_tokens = (
-                            model.src_dict.encode_line(
-                                " ".join(real_source), lambda x: x.split()
-                            )
-                            .long()
-                            .unsqueeze(0)
+                    )
+                    # Compute loss
+                    src_tokens = (
+                        model.src_dict.encode_line(
+                            " ".join(real_source), lambda x: x.split()
                         )
-                        src_lengths = [token.numel() for token in src_tokens]
-                        tgt_tokens = (
-                            model.tgt_dict.encode_line(
-                                " ".join(target), lambda x: x.split()
-                            )
-                            .long()
-                            .unsqueeze(0)
+                        .long()
+                        .unsqueeze(0)
+                    )
+                    src_lengths = [token.numel() for token in src_tokens]
+                    tgt_tokens = (
+                        model.tgt_dict.encode_line(
+                            " ".join(target), lambda x: x.split()
                         )
-                        tgt_lengths = [token.numel() for token in tgt_tokens]
-                        temp_dataset = LanguagePairDataset(
-                            src_tokens,
-                            src_lengths,
-                            model.src_dict,
-                            tgt_tokens,
-                            tgt_lengths,
-                            left_pad_source=args.left_pad_source,
-                            left_pad_target=args.left_pad_target,
-                            max_source_positions=self.max_source_positions,
-                            max_target_positions=self.max_target_positions,
-                        )
-                        sample = temp_dataset.collater(list(temp_dataset))
-                        sample["net_input"]["src_tokens"] = sample["net_input"][
-                            "src_tokens"
-                        ].cuda()
-                        sample["net_input"]["src_lengths"] = sample["net_input"][
-                            "src_lengths"
-                        ].cuda()
-                        sample["net_input"]["prev_output_tokens"] = sample["net_input"][
-                            "prev_output_tokens"
-                        ].cuda()
-                        sample["target"] = sample["target"].cuda()
-                        _, _, report = task.valid_step(
-                            sample, model.models[0], task.build_criterion(args)
-                        )
-                        losses.append(
-                            (context_sent_index, context_bias, report["loss"])
-                        )
-                        nll_losses.append(
-                            (context_sent_index, context_bias, report["nll_loss"])
-                        )
+                        .long()
+                        .unsqueeze(0)
+                    )
+                    tgt_lengths = [token.numel() for token in tgt_tokens]
+                    temp_dataset = LanguagePairDataset(
+                        src_tokens,
+                        src_lengths,
+                        model.src_dict,
+                        tgt_tokens,
+                        tgt_lengths,
+                        left_pad_source=args.left_pad_source,
+                        left_pad_target=args.left_pad_target,
+                        max_source_positions=self.max_source_positions,
+                        max_target_positions=self.max_target_positions,
+                    )
+                    sample = temp_dataset.collater(list(temp_dataset))
+                    sample["net_input"]["src_tokens"] = sample["net_input"][
+                        "src_tokens"
+                    ].cuda()
+                    sample["net_input"]["src_lengths"] = sample["net_input"][
+                        "src_lengths"
+                    ].cuda()
+                    sample["net_input"]["prev_output_tokens"] = sample["net_input"][
+                        "prev_output_tokens"
+                    ].cuda()
+                    sample["target"] = sample["target"].cuda()
+                    _, _, report = task.valid_step(
+                        sample, model.models[0], task.build_criterion(args)
+                    )
+                    losses.append((context_sent_index, context_bias, report["loss"]))
+                    nll_losses.append(
+                        (context_sent_index, context_bias, report["nll_loss"])
+                    )
                 result = {}
                 for score_name, score_list in zip(
                     ("bleu", "loss", "nll_loss"), (bleus, losses, nll_losses)

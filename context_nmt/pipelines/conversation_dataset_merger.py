@@ -7,12 +7,15 @@ import itertools
 import os
 import tempfile
 import subprocess
+import random
 
 import tqdm
 import luigi
 import pandas as pd
 import gokart
 import sentencepiece as spm
+import sacrebleu
+import MeCab
 from fairseq.models.transformer import TransformerModel
 
 from context_nmt.pipelines.jiji_dataset_merger import read_raw_jiji
@@ -198,6 +201,9 @@ class GenerateDataSplits(gokart.TaskOnKart):
     valid_source_paths = luigi.ListParameter()
     test_dataset_names = luigi.ListParameter()
     test_source_paths = luigi.ListParameter()
+    noisy_dataset_names = luigi.ListParameter(default=None)
+    noisy_dataset_source_paths = luigi.ListParameter(default=None)
+    noisy_dataset_langs = luigi.ListParameter(default=["en", "ja"])
 
     def requires(self):
         requirements = {}
@@ -213,6 +219,12 @@ class GenerateDataSplits(gokart.TaskOnKart):
                 split_name=split_name,
                 dataset_names=dataset_names,
                 source_paths=source_paths,
+            )
+        if self.noisy_dataset_names:
+            requirements["noisy"] = ReadTsvDatasets(
+                dataset_names=self.noisy_dataset_names,
+                source_paths=self.noisy_dataset_source_paths,
+                data_langs=self.noisy_dataset_langs,
             )
         return requirements
 
@@ -242,7 +254,7 @@ class GenerateDataSplits(gokart.TaskOnKart):
             self.dump(value, key)
 
 
-class ReadTsvDataset(gokart.TaskOnKart):
+class ReadTsvDatasets(gokart.TaskOnKart):
     task_namespace = "context_nmt"
     dataset_names = luigi.ListParameter()
     source_paths = luigi.ListParameter()
@@ -265,6 +277,7 @@ class ReadTsvDataset(gokart.TaskOnKart):
 
 class GenerateFairseqDataSplits(gokart.TaskOnKart):
     task_namespace = "context_nmt"
+    noisy_data = None
     context_pairs = None
     processor = spm.SentencePieceProcessor()
     train_dataset_names = luigi.ListParameter()
@@ -278,6 +291,7 @@ class GenerateFairseqDataSplits(gokart.TaskOnKart):
     target_lang = luigi.Parameter(default="ja")
     data_mode = luigi.Parameter(default="1-to-1")
     context_bias = luigi.IntParameter(default=1)
+    context_bias_maxmium = luigi.IntParameter(default=5)
     context_sentence_index_file = luigi.Parameter(default=None)
     context_metric_key = luigi.Parameter(default="logits")
     score_threhold = luigi.FloatParameter(default=0.3)
@@ -286,16 +300,23 @@ class GenerateFairseqDataSplits(gokart.TaskOnKart):
     data_format = luigi.Parameter(default="pkl")
     lang_order = luigi.ListParameter(default=("en", "ja"))
     sentence_level = luigi.BoolParameter()
+    noisy_dataset_names = luigi.ListParameter(default=None)
+    noisy_dataset_source_paths = luigi.ListParameter(default=None)
+    noisy_dataset_langs = luigi.ListParameter(default=["en", "ja"])
+    experiment_name = luigi.Parameter()
 
     def requires(self):
         if self.data_format == "pkl":
-            return GenerateDataSplits(
+            requirements = GenerateDataSplits(
                 train_dataset_names=self.train_dataset_names,
                 train_source_paths=self.train_source_paths,
                 valid_dataset_names=self.valid_dataset_names,
                 valid_source_paths=self.valid_source_paths,
                 test_dataset_names=self.test_dataset_names,
                 test_source_paths=self.test_source_paths,
+                noisy_dataset_names=self.noisy_dataset_names,
+                noisy_dataset_source_paths=self.noisy_dataset_source_paths,
+                noisy_dataset_langs=self.noisy_dataset_langs,
             )
         elif self.data_format == "tsv" and self.sentence_level:
             requirements = {}
@@ -307,25 +328,27 @@ class GenerateFairseqDataSplits(gokart.TaskOnKart):
                     (self.test_dataset_names, self.test_source_paths),
                 ),
             ):
-                requirements[split_name] = ReadTsvDataset(
+                requirements[split_name] = ReadTsvDatasets(
                     dataset_names=dataset_names,
                     source_paths=source_paths,
                     data_langs=self.lang_order,
                 )
-            return requirements
+        return requirements
 
     def output(self):
         outputs = {}
         for split_name in SPLIT_NAMES:
             for lang in (self.source_lang, self.target_lang):
                 outputs[f"{split_name}_{lang}"] = self.make_target(
-                    f"{split_name}.{lang}",
+                    f"{split_name}_{self.experiment_name}.{lang}",
                     processor=gokart.file_processor.TextFileProcessor(),
                 )
         return outputs
 
     def run(self):
         data = {split_name: self.load(split_name) for split_name in SPLIT_NAMES}
+        if self.noisy_dataset_names:
+            self.noisy_data = self.load("noisy")
         if not os.path.exists(self.sentencepiece_model_path):
             if self.sentence_level:
                 train_source = data["train"][self.source_lang]
@@ -373,8 +396,19 @@ class GenerateFairseqDataSplits(gokart.TaskOnKart):
         return docs
 
     def get_pairs(self, docs: Dict):
+        def tokenize_context(context):
+            if self.source_lang == "ja":
+                tagger = MeCab.Tagger()
+                context = " ".join(
+                    map(
+                        lambda x: x.split("\t")[0],
+                        tagger.parse(context).split("\n")[:-2],
+                    )
+                )
+            return context
+
         pairs = {self.source_lang: [], self.target_lang: []}
-        for doc_id, doc in docs.items():
+        for doc_id, doc in tqdm.tqdm(docs.items(), total=len(docs)):
             parallel_doc = set(
                 [
                     sent_id
@@ -389,29 +423,53 @@ class GenerateFairseqDataSplits(gokart.TaskOnKart):
                 ]
                 source_context = None
                 if "2-to-1" in str(self.data_mode):
-                    if self.context_pairs is None:
-                        if self.data_mode == "2-to-1":
-                            available_index = [
-                                index
-                                for index in range(0, sent_id)
-                                if doc[self.source_lang][index]
-                            ]
-                            if len(available_index) < self.context_bias:
-                                context_sent_index = -1
-                            else:
-                                context_sent_index = available_index[
-                                    -int(self.context_bias)
-                                ]
-                        else:
-                            context_sent_index = min(sent_id - self.context_bias, -1)
-                            if (
-                                context_sent_index not in parallel_doc
-                                and context_sent_index != -1
-                            ):
-                                continue
+                    if self.noisy_data:
+                        noisy_context = random.choice(self.noisy_data[self.source_lang])
+                        possible_context = [
+                            context
+                            for context in doc[self.source_lang][:sent_id]
+                            if context
+                        ][-1 : -int(self.context_bias_maxmium + 1) : -1]
+                        possible_context = list(
+                            map(lambda x: [tokenize_context(x)], possible_context)
+                        )
+                        while possible_context and any(
+                            sacrebleu.corpus_bleu(
+                                tokenize_context(noisy_context), possible_context
+                            ).counts
+                        ):
+                            noisy_context = random.choice(
+                                self.noisy_data[self.source_lang]
+                            )
+                        source_context = noisy_context
                     else:
-                        context_sent_index = self.context_pairs[doc_id][sent_id][0]
-                    source_context = docs[doc_id][self.source_lang][context_sent_index]
+                        if self.context_pairs is None:
+                            if self.data_mode == "2-to-1":
+                                available_index = [
+                                    index
+                                    for index in range(0, sent_id)
+                                    if doc[self.source_lang][index]
+                                ]
+                                if len(available_index) < self.context_bias:
+                                    context_sent_index = -1
+                                else:
+                                    context_sent_index = available_index[
+                                        -int(self.context_bias)
+                                    ]
+                            else:
+                                context_sent_index = min(
+                                    sent_id - self.context_bias, -1
+                                )
+                                if (
+                                    context_sent_index not in parallel_doc
+                                    and context_sent_index != -1
+                                ):
+                                    continue
+                        else:
+                            context_sent_index = self.context_pairs[doc_id][sent_id][0]
+                        source_context = docs[doc_id][self.source_lang][
+                            context_sent_index
+                        ]
                 if source_context:
                     source_context = self.processor.encode_as_pieces(source_context)
                     source = source_context + [CONCAT_TOKEN] + source
@@ -430,6 +488,9 @@ class RunFairseqTraining(gokart.TaskOnKart):
     test_dataset_names = luigi.ListParameter()
     test_source_paths = luigi.ListParameter()
     sentencepiece_model_path = luigi.Parameter()
+    noisy_dataset_names = luigi.ListParameter(default=None)
+    noisy_dataset_source_paths = luigi.ListParameter(default=None)
+    noisy_dataset_langs = luigi.ListParameter(default=["en", "ja"])
     source_lang = luigi.Parameter(default="en")
     target_lang = luigi.Parameter(default="ja")
     data_mode = luigi.Parameter(default="1-to-1")
@@ -474,6 +535,10 @@ class RunFairseqTraining(gokart.TaskOnKart):
             data_format=self.data_format,
             lang_order=self.lang_order,
             sentence_level=self.sentence_level,
+            noisy_dataset_names=self.noisy_dataset_names,
+            noisy_dataset_source_paths=self.noisy_dataset_source_paths,
+            noisy_dataset_langs=self.noisy_dataset_langs,
+            experiment_name=self.get_experiment_name(),
         )
 
     def get_experiment_name(self):
@@ -493,6 +558,9 @@ class RunFairseqTraining(gokart.TaskOnKart):
                 name_components.append(f"context_bias_{self.context_bias}")
         if self.context_metric_key != "logits":
             name_components.append(self.context_metric_key)
+        if self.noisy_dataset_names:
+            name_components.append("noisy")
+            name_components += list(self.noisy_dataset_names)
         experiment_name = "_".join(name_components)
         return experiment_name
 
