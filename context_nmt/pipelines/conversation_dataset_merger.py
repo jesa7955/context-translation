@@ -54,7 +54,7 @@ def train_sentencepiece_from_list(
             )
 
 
-def read_context_index_file(file_path: str, key: str = "logits"):
+def read_context_index_file(file_path: str, key: str = "logits", mode: str = "max"):
     context_pairs = None
     if file_path and os.path.exists(file_path):
         logger.info(f"Using {key} to filter context")
@@ -62,7 +62,10 @@ def read_context_index_file(file_path: str, key: str = "logits"):
         with open(file_path, "r") as source:
             for line in source:
                 model_output = json.loads(line)
-                score = model_output[key][1]
+                if mode == "max":
+                    score = model_output[key][1]
+                else:
+                    score = -model_output[key][0]
                 d_id, s_id, cs_id = model_output["data_indexers"]
                 if (
                     not s_id in context_pairs[d_id]
@@ -294,6 +297,7 @@ class GenerateFairseqDataSplits(gokart.TaskOnKart):
     context_bias_maxmium = luigi.IntParameter(default=5)
     context_sentence_index_file = luigi.Parameter(default=None)
     context_metric_key = luigi.Parameter(default="logits")
+    context_metric_mode = luigi.Parameter(default="max")
     score_threhold = luigi.FloatParameter(default=0.3)
     vocab_size = luigi.IntParameter(default=32000)
     normalization_rule_name = luigi.Parameter(default="nmt_nfkc_cf")
@@ -377,7 +381,9 @@ class GenerateFairseqDataSplits(gokart.TaskOnKart):
         for split_name in SPLIT_NAMES:
             if not self.sentence_level:
                 self.context_pairs = read_context_index_file(
-                    self.context_sentence_index_file, self.context_metric_key
+                    self.context_sentence_index_file,
+                    self.context_metric_key,
+                    self.context_metric_mode,
                 )
                 if self.context_pairs:
                     logger.info("We have some gold indicators!!!")
@@ -497,6 +503,7 @@ class RunFairseqTraining(gokart.TaskOnKart):
     context_bias = luigi.IntParameter(default=1)
     context_sentence_index_file = luigi.Parameter(default=None)
     context_metric_key = luigi.Parameter(default="logits")
+    context_metric_mode = luigi.Parameter(default="max")
     score_threhold = luigi.FloatParameter(default=0.3)
     vocab_size = luigi.IntParameter(default=32000)
     normalization_rule_name = luigi.Parameter(default="nmt_nfkc_cf")
@@ -558,6 +565,7 @@ class RunFairseqTraining(gokart.TaskOnKart):
                 name_components.append(f"context_bias_{self.context_bias}")
         if self.context_metric_key != "logits":
             name_components.append(self.context_metric_key)
+        name_components.append(self.context_metric_mode)
         if self.noisy_dataset_names:
             name_components.append("noisy")
             name_components += list(self.noisy_dataset_names)

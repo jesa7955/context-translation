@@ -11,7 +11,8 @@ from collections import defaultdict
 
 import numpy as np
 import sentencepiece as spm
-from googletrans import Translator
+import MeCab
+import sacrebleu
 from allennlp.data.dataset_readers.dataset_reader import DatasetReader
 from allennlp.data.fields import LabelField, TextField, MetadataField
 from allennlp.data import Token, Instance
@@ -48,7 +49,7 @@ class ContextTranslationDatasetReader(DatasetReader):
         self,
         window_size: int = 5,
         source_lang: str = "en",
-        target_lang: str = "fr",
+        target_lang: str = "ja",
         source_vocabulary_size: int = 16000,
         target_vocabulary_size: int = 16000,
         share_vocabulary: bool = False,
@@ -57,8 +58,8 @@ class ContextTranslationDatasetReader(DatasetReader):
         normalization_rule_name: str = "nmt_nfkc_cf",
         source_token_indexers: Dict[str, TokenIndexer] = None,
         target_token_indexers: Dict[str, TokenIndexer] = None,
-        source_max_sequence_length: int = 512,
-        target_max_sequence_length: int = 512,
+        source_max_sequence_length: int = 128,
+        target_max_sequence_length: int = 128,
         translation_data_mode: str = "2-to-1",
         classification_data_mode: str = "train",
         concat_source_context: bool = True,
@@ -67,7 +68,7 @@ class ContextTranslationDatasetReader(DatasetReader):
         source_add_factors: bool = False,
         source_only: bool = False,
         context_sentence_index_file: str = None,
-        use_google_trans: bool = False,
+        noisy_context_dataset_path: str = None,
         lazy: bool = False,
         cache_directory: str = None,
     ) -> None:
@@ -98,6 +99,12 @@ class ContextTranslationDatasetReader(DatasetReader):
         self._source_add_factors = source_add_factors
         self._source_only = source_only
         self._context_pairs = read_context_index_file(context_sentence_index_file)
+        self._noisy_context_dataset = None
+        if noisy_context_dataset_path:
+            extension = os.path.splitext(noisy_context_dataset_path)[1]
+            if extension == ".pkl":
+                with open(noisy_context_dataset_path, "rb") as source:
+                    self._noisy_context_dataset = pkl.load(source)
         if self._context_pairs:
             logger.info("We have some gold indicators!!!")
         else:
@@ -236,6 +243,17 @@ class ContextTranslationDatasetReader(DatasetReader):
                 yield instance
 
     def _generate_instances(self, doc_id, parallel_document, raw_documents):
+        def tokenize_context(context):
+            if self._source_lang == "ja":
+                tagger = MeCab.Tagger()
+                context = " ".join(
+                    map(
+                        lambda x: x.split("\t")[0],
+                        tagger.parse(context).split("\n")[:-2],
+                    )
+                )
+            return context
+
         for sent_id in parallel_document:
             source = raw_documents[doc_id][self._source_lang][sent_id]
             target = raw_documents[doc_id][self._target_lang][sent_id]
@@ -285,62 +303,101 @@ class ContextTranslationDatasetReader(DatasetReader):
                         source_context, source, target_context, target
                     )
                 elif self._classification_data_mode == "train":
-                    all_previous_sentences = set(
-                        [
-                            p_id
-                            for p_id in range(sent_id - 1, -1, -1)
-                            if raw_documents[doc_id][self._source_lang][p_id]
-                            and p_id != context_sent_index
-                        ]
-                    )
-                    # In restricted 2-to-1 mode we can only use previous sentences
-                    # that are paired with target
-                    if self._translation_data_mode == "2-to-1-restricted":
-                        all_previous_sentences = all_previous_sentences.intersection(
-                            parallel_document
-                        )
-                    if all_previous_sentences:
-                        negative_index = random.sample(all_previous_sentences, 1)[0]
-                        negative_source_context = raw_documents[doc_id][
-                            self._source_lang
-                        ][negative_index]
-                        translated_lang = f"{self._target_lang}_translated"
-                        if translated_lang in raw_documents[doc_id]:
-                            negative_target_context = (
-                                raw_documents[doc_id][translated_lang][negative_index]
-                                if target_context
-                                else None
-                            )
-                            negative_target = raw_documents[doc_id][translated_lang][
-                                sent_id
-                            ]
+                    if self._noisy_context_dataset:
+                        possible_context_ids = [
+                            context_id
+                            for context_id in range(sent_id)
+                            if raw_documents[doc_id][self._source_lang][context_id]
+                        ][-1 : -int(self._window_size + 1) : -1]
+                        if not possible_context_ids:
+                            continue
                         else:
-                            negative_target_context = (
-                                raw_documents[doc_id][self._target_lang][negative_index]
-                                if target_context
-                                else None
+                            context_sent_index = random.choice(possible_context_ids)
+                            negative_source_context = random.choice(
+                                self._noisy_context_dataset[self._source_lang]
                             )
-                            negative_target = target
-                        yield self.text_to_instance(
-                            negative_source_context,
-                            source,
-                            negative_target_context,
-                            negative_target,
-                            doc_id,
-                            sent_id,
-                            negative_index,
-                            0,
+                            possible_context = list(
+                                map(
+                                    lambda x: [
+                                        tokenize_context(
+                                            raw_documents[self._source_lang][x]
+                                        )
+                                    ],
+                                    possible_context_ids,
+                                )
+                            )
+                            while any(
+                                sacrebleu.corpus_bleu(
+                                    tokenize_context(negative_source_context),
+                                    possible_context,
+                                ).counts
+                            ):
+                                negative_source_context = random.choice(
+                                    self._noisy_context_dataset[self._source_lang]
+                                )
+                            source_context = raw_documents[self._source_lang][
+                                random.choice(possible_context_ids)
+                            ]
+                            negative_index = -1
+                    else:
+                        all_previous_sentences = set(
+                            [
+                                p_id
+                                for p_id in range(sent_id - 1, -1, -1)
+                                if raw_documents[doc_id][self._source_lang][p_id]
+                                and p_id != context_sent_index
+                            ]
                         )
-                        yield self.text_to_instance(
-                            source_context,
-                            source,
-                            target_context,
-                            target,
-                            doc_id,
-                            sent_id,
-                            context_sent_index,
-                            1,
+                        # In restricted 2-to-1 mode we can only use previous sentences
+                        # that are paired with target
+                        if self._translation_data_mode == "2-to-1-restricted":
+                            all_previous_sentences = all_previous_sentences.intersection(
+                                parallel_document
+                            )
+                        if all_previous_sentences:
+                            negative_index = random.sample(all_previous_sentences, 1)[0]
+                            negative_source_context = raw_documents[doc_id][
+                                self._source_lang
+                            ][negative_index]
+                        else:
+                            continue
+                    translated_lang = f"{self._target_lang}_translated"
+                    if translated_lang in raw_documents[doc_id]:
+                        negative_target_context = (
+                            raw_documents[doc_id][translated_lang][negative_index]
+                            if target_context
+                            else None
                         )
+                        negative_target = raw_documents[doc_id][translated_lang][
+                            sent_id
+                        ]
+                    else:
+                        negative_target_context = (
+                            raw_documents[doc_id][self._target_lang][negative_index]
+                            if target_context
+                            else None
+                        )
+                        negative_target = target
+                    yield self.text_to_instance(
+                        negative_source_context,
+                        source,
+                        negative_target_context,
+                        negative_target,
+                        doc_id,
+                        sent_id,
+                        negative_index,
+                        0,
+                    )
+                    yield self.text_to_instance(
+                        source_context,
+                        source,
+                        target_context,
+                        target,
+                        doc_id,
+                        sent_id,
+                        context_sent_index,
+                        1,
+                    )
                 elif self._classification_data_mode == "inference":
                     index_range = set([-1])
                     if self._window_size > 0:

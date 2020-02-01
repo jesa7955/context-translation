@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 class JijiDatasetReader(ContextTranslationDatasetReader):
     def __init__(
         self,
-        window_size: int = 6,
+        window_size: int = 5,
         score_threshold: float = float("-inf"),
         read_from_raw: bool = False,
         source_lang: str = "en",
@@ -46,7 +46,7 @@ class JijiDatasetReader(ContextTranslationDatasetReader):
         source_add_factors: bool = False,
         source_only: bool = False,
         context_sentence_index_file: str = None,
-        use_google_trans: bool = False,
+        noisy_context_dataset_path: str = None,
         lazy: bool = False,
         cache_directory: str = None,
     ) -> None:
@@ -70,7 +70,7 @@ class JijiDatasetReader(ContextTranslationDatasetReader):
             source_add_factors=source_add_factors,
             source_only=source_only,
             context_sentence_index_file=context_sentence_index_file,
-            use_google_trans=use_google_trans,
+            noisy_context_dataset_path=noisy_context_dataset_path,
             lazy=lazy,
             cache_directory=cache_directory,
         )
