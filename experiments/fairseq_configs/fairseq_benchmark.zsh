@@ -1,5 +1,5 @@
 SPM_MODEL_PATH="/data/10/litong/NICT-MT/all-4-sentencepiece-en_ja-32000.model"
-BASE_PATH="/data/temp/litong/context_nmt/fairseq/"
+BASE_PATH="/data/temp/litong/context_nmt/fairseq_temp/"
 CUDA_VISIBLE_DEVICES=${1}
 BASE_SAVE_PATH=${2}
 DATA_BASE=${BASE_PATH}/data-bin/
@@ -13,7 +13,8 @@ do
     TARGET_LANG=$(echo ${LANG_PAIR} | cut -d"_" -f 2)
     SAVE_PATH=${BASE_SAVE_PATH}/${LANG_PAIR}
     mkdir -p ${SAVE_PATH}
-    for MODEL in $(find ${BASE_PATH} -maxdepth 1 -name "*${LANG_PAIR}*"| grep -v factored | grep -v "1-to-1" | sort -u | rev | cut -d"/" -f 1 | rev)
+    # for MODEL in $(find ${BASE_PATH} -maxdepth 1 -name "*${LANG_PAIR}*"| grep -v factored | grep -v "1-to-1" | sort -u | rev | cut -d"/" -f 1 | rev)
+    for MODEL in $(find ${BASE_PATH} -maxdepth 1 -name "*${LANG_PAIR}*"| grep -v factored | sort -u | rev | cut -d"/" -f 1 | rev)
     do
         echo "Model -> ${MODEL}" >> ${RESULT_FILE}
         for DATA in $(ls -tl resources/test*${SOURCE_LANG} | grep "Jan 24\|Jan 25" | tail -10 | sort -k 5 --reverse | cut -d" " -f 9 | head -5)

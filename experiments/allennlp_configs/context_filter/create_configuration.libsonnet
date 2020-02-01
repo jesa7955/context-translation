@@ -34,13 +34,16 @@ function(dataset_reader,
     },
   },
   // limited translated
-  //train_data_path: '/home/litong/context_translation/resources/train_jparacrawl_base_6e8d2c7a83f198f59385299d62f0866e.pkl',
+  train_data_path: '/home/litong/context_translation/resources/train_jparacrawl_base_6e8d2c7a83f198f59385299d62f0866e.pkl',
   // full translated
-  train_data_path: '/home/litong/context_translation/resources/train_jparacrawl_base_d4d2024b335a1102448633f23fa3714b.pkl',
+  //train_data_path: '/home/litong/context_translation/resources/train_jparacrawl_base_d4d2024b335a1102448633f23fa3714b.pkl',
   validation_data_path: '/home/litong/context_translation/resources/valid_0a06896723176aff827aac15a2e1ac94.pkl',
-  test_data_path: '/home/litong/context_translation/resources/test_3c5cba7d2f64b7fb2d6b5013adc7a888.pkl',
+  //test_data_path: '/home/litong/context_translation/resources/test_3c5cba7d2f64b7fb2d6b5013adc7a888.pkl',
   //train_data_path: '/home/litong/context_translation/resources/valid_0a06896723176aff827aac15a2e1ac94.pkl',
   //validation_data_path: '/home/litong/context_translation/resources/test_3c5cba7d2f64b7fb2d6b5013adc7a888.pkl',
+  //distributed: {
+  //  cuda_devices: [0, 1, 2],
+  //}, 
   trainer: {
     cuda_device: cuda_device,
     num_epochs: num_epochs,

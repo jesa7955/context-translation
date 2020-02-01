@@ -1,5 +1,6 @@
-READY_FILE="resources/jiji_context_filter_cleaned_limited_ja_en_0_ready"
-TARGET_FILE="/home/litong/context_translation/resources/context_filter/jiji_context_filter_cleaned_limited_ja_en_0"
+PID=3273
+READY_FILE="resources/${PID}_ready"
+TARGET_FILE="/home/litong/context_translation/resources/context_filter/jiji_context_filter_translated_full_smaller_lr_en_ja_0"
 while [ ! -e ${READY_FILE} ]; do
     echo "waiting for indicators"
     sleep 60
@@ -14,5 +15,5 @@ for GPU in $(seq 0 3); do
         break
     fi
 done
-CUDA_VISIBLE_DEVICES=${GPU} bash experiments/luigi_batches/train_fairseq_transformer.sh 32000 ja en 2-to-1 \
+CUDA_VISIBLE_DEVICES=${GPU} bash experiments/luigi_batches/train_fairseq_transformer.sh 32000 en ja 2-to-1 \
     /data/temp/litong/context_nmt/fairseq_temp 1 "--context-sentence-index-file ${TARGET_FILE}"

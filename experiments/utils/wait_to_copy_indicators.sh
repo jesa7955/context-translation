@@ -1,10 +1,11 @@
-READY_FILE="resources/jiji_context_filter_cleaned_limited_ja_en_0_ready"
-TARGET_FILE="/home/litong/context_translation/resources/context_filter/jiji_context_filter_cleaned_limited_ja_en_0"
-while [ $(nvidia-smi | grep 23870 | wc -l) -eq 1 ]; do
+PID=3273
+READY_FILE="resources/${PID}_ready"
+TARGET_FILE="/data/local/litong/context_nmt/context_sentence_indexes/jiji_context_filter_translated_full_smaller_lr_en_ja_0"
+while [ $(nvidia-smi | grep ${PID} | wc -l) -eq 1 ]; do
     echo "waiting for the source file to ready"
     sleep 60
 done
-cp /data/local/litong/context_nmt/context_sentence_indexes/jiji_context_filter_cleaned_limited_ja_en_0 ${TARGET_FILE}
+cp ${TARGET_FILE} resources/context_filter/
 
 touch ${READY_FILE}
 

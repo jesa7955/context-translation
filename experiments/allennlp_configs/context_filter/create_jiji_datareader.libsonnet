@@ -34,5 +34,4 @@ function(trans_mode,
   },
   cache_directory: cache_directory,
   context_sentence_index_file: context_sentence_index_file,
-  use_google_trans: use_google_trans,
 }
