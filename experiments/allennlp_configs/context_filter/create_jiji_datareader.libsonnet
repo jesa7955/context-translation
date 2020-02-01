@@ -7,6 +7,7 @@ function(trans_mode,
          source_lang='en',
          target_lang='ja',
          context_sentence_index_file=null,
+         noisy_context_dataset_path=null,
          use_google_trans=false) {
   type: 'jiji',
   window_size: window_size, 
@@ -34,4 +35,5 @@ function(trans_mode,
   },
   cache_directory: cache_directory,
   context_sentence_index_file: context_sentence_index_file,
+  noisy_context_dataset_path: noisy_context_dataset_path,
 }

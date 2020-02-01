@@ -320,13 +320,18 @@ class ContextTranslationDatasetReader(DatasetReader):
                                 map(
                                     lambda x: [
                                         tokenize_context(
-                                            raw_documents[self._source_lang][x]
+                                            raw_documents[doc_id][self._source_lang][x]
                                         )
                                     ],
                                     possible_context_ids,
                                 )
                             )
-                            while any(
+                            possible_context_len = min(
+                                map(lambda x: len(x[0].split()), possible_context)
+                            )
+                            while len(
+                                tokenize_context(negative_source_context).split()
+                            ) < possible_context_len and any(
                                 sacrebleu.corpus_bleu(
                                     tokenize_context(negative_source_context),
                                     possible_context,
@@ -335,7 +340,7 @@ class ContextTranslationDatasetReader(DatasetReader):
                                 negative_source_context = random.choice(
                                     self._noisy_context_dataset[self._source_lang]
                                 )
-                            source_context = raw_documents[self._source_lang][
+                            source_context = raw_documents[doc_id][self._source_lang][
                                 random.choice(possible_context_ids)
                             ]
                             negative_index = -1
