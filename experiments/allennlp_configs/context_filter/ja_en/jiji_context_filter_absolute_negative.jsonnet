@@ -10,4 +10,4 @@ local dataset_reader = create_dataset_reader('2-to-1',
                                              target_lang='en',
                                              noisy_context_dataset_path='/home/litong/context_translation/resources/jparacrawl_0.77.pkl');
 
-create_configuration(dataset_reader, bert_name=bert_name, batch_size=48, cuda_device=1)
+create_configuration(dataset_reader, bert_name=bert_name, batch_size=32, cuda_device=1)

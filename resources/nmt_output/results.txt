@@ -12,6 +12,8 @@ jiji_onto_ami_conver_train_2-to-1_en_ja_context_bias_4
 	valid: 14.69	test: 15.38
 jiji_onto_ami_conver_train_2-to-1_en_ja_context_bias_5
 	valid: 15.46	test: 15.43
+jiji_onto_ami_conver_train_2-to-1_en_ja_context_bias_1_noisy_jesc
+	valid: 14.98	test: 15.67
 
 ja_en
 ------------------------------
@@ -27,4 +29,5 @@ jiji_onto_ami_conver_train_2-to-1_ja_en_context_bias_4
 	valid: 17.51	test: 17.46
 jiji_onto_ami_conver_train_2-to-1_ja_en_context_bias_5
 	valid: 16.73	test: 17.15
-
+jiji_onto_ami_conver_train_2-to-1_ja_en_context_bias_1_noisy_jesc
+	valid: 17.77	test: 17.97
