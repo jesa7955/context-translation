@@ -24,6 +24,7 @@ sentencepiece = "*"
 fairseq = {git = "https://github.com/pytorch/fairseq.git",ref = "master"}
 sacrebleu = "*"
 mecab-python3 = "*"
+fasttext = "*"
 
 [requires]
 python_version = "3.7"
