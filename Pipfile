@@ -25,6 +25,8 @@ fairseq = {git = "https://github.com/pytorch/fairseq.git",ref = "master"}
 sacrebleu = "*"
 mecab-python3 = "*"
 fasttext = "*"
+pyknp = "*"
+ginza = "*"
 
 [requires]
 python_version = "3.7"
