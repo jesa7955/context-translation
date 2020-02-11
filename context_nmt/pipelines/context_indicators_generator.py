@@ -32,6 +32,7 @@ class GenerateContextIndicator(gokart.TaskOnKart):
     context_aware_sentencepiece_model = luigi.Parameter()
     max_source_positions = luigi.IntParameter(default=128)
     max_target_positions = luigi.IntParameter(default=128)
+    max_sentences = luigi.IntParameter(default=128)
     sentence_translation_model_name = luigi.Parameter(default=None)
     sentence_translation_models = luigi.DictParameter(default={})
     sentence_sentencepiece_models = luigi.DictParameter(default={})
@@ -182,21 +183,29 @@ class GenerateContextIndicator(gokart.TaskOnKart):
                     max_source_positions=self.max_source_positions,
                     max_target_positions=self.max_target_positions,
                 )
-                sample = temp_dataset.collater(list(temp_dataset))
-                sample["net_input"]["src_tokens"] = sample["net_input"][
-                    "src_tokens"
-                ].cuda()
-                sample["net_input"]["src_lengths"] = sample["net_input"][
-                    "src_lengths"
-                ].cuda()
-                sample["net_input"]["prev_output_tokens"] = sample["net_input"][
-                    "prev_output_tokens"
-                ].cuda()
-                sample["target"] = sample["target"].cuda()
-                with torch.no_grad():
-                    _, _, report = criterion(model.models[0], sample, False)
+                reports = collections.defaultdict(list)
+                iterator = task.get_batch_iterator(
+                    dataset=temp_dataset, max_sentences=self.max_sentences,
+                )
+                for sample in iterator.next_epoch_itr(shuffle=False):
+                    sample["net_input"]["src_tokens"] = sample["net_input"][
+                        "src_tokens"
+                    ].cuda()
+                    sample["net_input"]["src_lengths"] = sample["net_input"][
+                        "src_lengths"
+                    ].cuda()
+                    sample["net_input"]["prev_output_tokens"] = sample["net_input"][
+                        "prev_output_tokens"
+                    ].cuda()
+                    sample["target"] = sample["target"].cuda()
+                    with torch.no_grad():
+                        _, _, report = criterion(model.models[0], sample, False)
+                    for key, value in report.items():
+                        reports[key].append(value)
                 for key in ("loss", "nll_loss"):
-                    for value, (sent_id, _) in zip(report[key], real_targets.items()):
+                    for value, (sent_id, _) in zip(
+                        torch.cat(reports[key]), real_targets.items()
+                    ):
                         batch_results[sent_id][key][context_bias] = float(value)
             for sent_id, value in batch_results.items():
                 results[doc_id][sent_id] = value

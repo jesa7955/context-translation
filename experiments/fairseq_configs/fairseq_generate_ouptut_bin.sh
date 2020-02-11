@@ -20,7 +20,7 @@ do
         do
             TARGET=${SAVE_PATH}/${MODEL_NAME}_${SPLIT}
             REFERENCE=${TARGET}.ref
-            fairseq-generate  ${MODEL} --path ${MODEL}/checkpoint_best.pt --beam 6 \
+            fairseq-generate  ${MODEL} --path ${MODEL}/../../${MODEL_NAME}/checkpoint_best.pt --beam 6 \
                 --user-dir context_nmt --batch-size 500 --gen-subset ${SPLIT} | tee /tmp/gen.out
             grep ^H /tmp/gen.out | cut -f3- > /tmp/gen.out.sys
             grep ^T /tmp/gen.out | cut -f2- > /tmp/gen.out.ref
