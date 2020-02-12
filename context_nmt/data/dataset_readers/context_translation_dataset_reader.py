@@ -34,6 +34,30 @@ SPECIAL_CHARACTER_COVERAGES_LANG = set(["ja", "zh", "kr"])
 logger = logging.getLogger(__name__)
 
 
+def read_context_indicators(path: str, key: str):
+    with open(path, "rb") as source:
+        data = pkl.load(source)
+    context_pairs = defaultdict(dict)
+    counter = 0
+    for doc_id, doc in data.items():
+        for sent_id, score_lists in doc.items():
+            sorted_lists = sorted(
+                [[bias, score] for bias, score in score_lists[key].items()],
+                key=lambda x: x[1],
+            )
+            best_context = sorted_lists[0]
+            if best_context[0] == -1 or sent_id < best_context[0]:
+                best_context[0] = -1
+            else:
+                best_context[0] = sent_id - best_context[0]
+            if sorted_lists[-1][1] != 0.0:
+                context_pairs[doc_id][sent_id] = best_context
+            else:
+                counter += 1
+    print(f"scores on all systems are 0 for {counter} sentences")
+    return context_pairs
+
+
 class ContextTranslationDatasetReader(DatasetReader):
     """
     Read a bitext file with document boundary and create sentences pairs.
@@ -68,6 +92,8 @@ class ContextTranslationDatasetReader(DatasetReader):
         source_add_factors: bool = False,
         source_only: bool = False,
         context_sentence_index_file: str = None,
+        context_indicators_file: str = None,
+        context_indicators_key: str = None,
         noisy_context_dataset_path: str = None,
         lazy: bool = False,
         cache_directory: str = None,
@@ -98,7 +124,12 @@ class ContextTranslationDatasetReader(DatasetReader):
         self._source_add_end_token = source_add_end_token
         self._source_add_factors = source_add_factors
         self._source_only = source_only
-        self._context_pairs = read_context_index_file(context_sentence_index_file)
+        if context_indicators_file:
+            self._context_pairs = read_context_indicators(
+                context_indicators_file, context_indicators_key
+            )
+        else:
+            self._context_pairs = read_context_index_file(context_sentence_index_file)
         self._noisy_context_dataset = None
         if noisy_context_dataset_path:
             extension = os.path.splitext(noisy_context_dataset_path)[1]
@@ -268,7 +299,11 @@ class ContextTranslationDatasetReader(DatasetReader):
                     target_context = None
                     # We have a magical dict which contains the indexes of context sentences !
                     if self._context_pairs:
-                        context_sent_index = self._context_pairs[doc_id][sent_id][0]
+                        try:
+                            context_sent_index = self._context_pairs[doc_id][sent_id][0]
+                        except:
+                            context_sent_index = -1
+                            print(doc_id, sent_id)
                     # Oh, we have to find context sentences ourselves
                     else:
                         # Previous sentence in original document is used
