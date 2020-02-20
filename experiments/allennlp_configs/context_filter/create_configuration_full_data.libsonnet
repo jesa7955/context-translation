@@ -47,7 +47,7 @@ function(dataset_reader,
   trainer: {
     cuda_device: cuda_device,
     num_epochs: num_epochs,
-    num_serialized_models_to_keep: 1,
+    //num_serialized_models_to_keep: 1,
     optimizer: {
       type: 'adamw',
       lr: 5e-5,

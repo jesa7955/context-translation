@@ -520,6 +520,7 @@ class RunFairseqTraining(gokart.TaskOnKart):
     add_source_factor = luigi.BoolParameter()
     source_factor_embed_dim = luigi.IntParameter(default=8)
     source_factor_type_num = luigi.IntParameter(default=2)
+    train_random_seed = luigi.Parameter(default="42")
 
     def requires(self):
         return GenerateFairseqDataSplits(
@@ -569,6 +570,8 @@ class RunFairseqTraining(gokart.TaskOnKart):
         if self.noisy_dataset_names:
             name_components.append("noisy")
             name_components += list(self.noisy_dataset_names)
+        name_components.append("seed")
+        name_components.append(self.train_random_seed)
         experiment_name = "_".join(name_components)
         return experiment_name
 
@@ -605,6 +608,7 @@ class RunFairseqTraining(gokart.TaskOnKart):
 
         # Train Model
         train_params = ["fairseq-train", fairseq_data_path]
+        train_params += ["--seed", str(self.train_random_seed)]
         train_params += [
             "--eval-bleu",
             "--eval-bleu-args",

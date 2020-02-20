@@ -1,4 +1,4 @@
-local create_configuration = import '../create_configuration.libsonnet';
+local create_configuration = import '../create_configuration_full_data.libsonnet';
 local create_dataset_reader = import '../create_jiji_datareader.libsonnet';
 local bert_name = 'bert-base-japanese';
 

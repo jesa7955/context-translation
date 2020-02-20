@@ -1,7 +1,7 @@
 SPM_MODEL_PATH="/data/10/litong/NICT-MT/all-4-sentencepiece-en_ja-32000.model"
-BASE_PATH="/data/temp/litong/context_nmt/fairseq/data-bin"
-CUDA_VISIBLE_DEVICES=${1}
-BASE_SAVE_PATH=${2}
+BASE_PATH="/data/temp/litong/fairseq/data-bin"
+#CUDA_VISIBLE_DEVICES=${1}
+BASE_SAVE_PATH=${1}
 RESULT_FILE=${BASE_SAVE_PATH}/results.txt
 mkdir -p ${BASE_SAVE_PATH}
 for LANG_PAIR in $(echo "en_ja ja_en" | tr " " "\n")
@@ -11,7 +11,7 @@ do
     SAVE_PATH=${BASE_SAVE_PATH}/${LANG_PAIR}
     mkdir -p ${SAVE_PATH}
     # for MODEL in $(find ${BASE_PATH} -maxdepth 1 | grep "${LANG_PAIR}" | sort -u | grep filtered)
-    for MODEL in $(find ${BASE_PATH} -maxdepth 1 | grep "${LANG_PAIR}" | sort -u )
+    for MODEL in $(find ${BASE_PATH} -maxdepth 1 | grep "${LANG_PAIR}" | sort -u)
     do
         MODEL_NAME=$(echo ${MODEL} | rev | cut -d"/" -f 1 | rev)
         echo ${MODEL_NAME} >> ${RESULT_FILE}

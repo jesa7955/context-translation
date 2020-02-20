@@ -13,7 +13,7 @@ function(dataset_reader,
     type: 'context_sentence_filter',
     model_name: bert_name,
     num_labels: 2,
-    load_classifier: true,
+    load_classifier: false,
     transformer_trainable: true,
     classifier_traninable: true,
     seq_decoder: {

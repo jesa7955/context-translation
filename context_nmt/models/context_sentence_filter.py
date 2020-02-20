@@ -43,7 +43,7 @@ class ContextSentenceFilter(Model):
         load_classifier: bool = False,
         transformer_trainable: bool = True,
         classifier_traninable: bool = True,
-        dropout: float = 0.0,
+        dropout: float = 0.1,
         index: str = "transformer",
         label_namespace: str = "label",
         initializer: InitializerApplicator = InitializerApplicator(),
@@ -68,11 +68,8 @@ class ContextSentenceFilter(Model):
         else:
             classifier = torch.nn.Linear(config.hidden_size, config.num_labels)
             initializer(classifier)
-            self.classifier = torch.nn.ModuleList(
-                (torch.nn.Dropout(dropout), classifier)
-            )
+            self.classifier = torch.nn.Sequential(torch.nn.Dropout(dropout), classifier)
 
-        # Add a LSTMCell for translation is specified such
         self._accuracy = CategoricalAccuracy()
         self._loss = torch.nn.CrossEntropyLoss()
         self._index = index

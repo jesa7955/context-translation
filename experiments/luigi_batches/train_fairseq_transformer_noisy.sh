@@ -13,4 +13,4 @@ python gokart_runner.py --local-scheduler --module context_nmt \
     --experiment-path ${5} \
     --preprocess-workers 8 --batch-size 4096 --save-interval 2000 \
     --context-bias ${6} \
-    ${7} ${8}
+    --train-random-seed ${7}

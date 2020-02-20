@@ -7,7 +7,7 @@ import json
 import pickle as pkl
 from overrides import overrides
 from typing import List, Dict, Iterable
-from collections import defaultdict
+from collections import defaultdict, Counter
 
 import numpy as np
 import sentencepiece as spm
@@ -41,20 +41,16 @@ def read_context_indicators(path: str, key: str):
     counter = 0
     for doc_id, doc in data.items():
         for sent_id, score_lists in doc.items():
-            sorted_lists = sorted(
+            sorted_list = sorted(
                 [[bias, score] for bias, score in score_lists[key].items()],
                 key=lambda x: x[1],
             )
-            best_context = sorted_lists[0]
-            if best_context[0] == -1 or sent_id < best_context[0]:
-                best_context[0] = -1
-            else:
-                best_context[0] = sent_id - best_context[0]
-            if sorted_lists[-1][1] != 0.0:
+            best_context = sorted_list[0]
+            if sorted_list[-1][1] != 0.0:
                 context_pairs[doc_id][sent_id] = best_context
             else:
                 counter += 1
-    print(f"scores on all systems are 0 for {counter} sentences")
+    logger.info(f"scores on all systems are 0 for {counter} sentences")
     return context_pairs
 
 
@@ -128,8 +124,10 @@ class ContextTranslationDatasetReader(DatasetReader):
             self._context_pairs = read_context_indicators(
                 context_indicators_file, context_indicators_key
             )
+            self._context_pairs_bias = True
         else:
             self._context_pairs = read_context_index_file(context_sentence_index_file)
+            self._context_pairs_bias = False
         self._noisy_context_dataset = None
         if noisy_context_dataset_path:
             extension = os.path.splitext(noisy_context_dataset_path)[1]
@@ -257,6 +255,39 @@ class ContextTranslationDatasetReader(DatasetReader):
             self._train_sentencepiece_from_list(sentences)
             self._source_tokenizer.load()
             self._target_tokenizer.load()
+        if self._context_pairs_bias:
+            context_pairs = defaultdict(dict)
+            for doc_id, doc in self._context_pairs.items():
+                if doc_id not in docs:
+                    continue
+                for sent_id, (context_bias, score) in doc.items():
+                    available_indexes = [
+                        index
+                        for index in range(sent_id)
+                        if docs[doc_id][self._source_lang][index].strip()
+                    ]
+                    if context_bias != -1 and len(available_indexes) < context_bias:
+                        context_bias = -1
+                    if context_bias != -1:
+                        context_index = available_indexes[-context_bias]
+                    else:
+                        context_index = -1
+                    self._context_pairs[doc_id][sent_id] = (context_index, score)
+                    context_pairs[doc_id][sent_id] = context_bias
+            logger.info(
+                str(
+                    Counter(
+                        list(
+                            itertools.chain.from_iterable(
+                                [
+                                    [index for index in doc.values()]
+                                    for doc in context_pairs.values()
+                                ]
+                            )
+                        )
+                    )
+                )
+            )
         iterators = [
             self._generate_instances(doc_id, parallel_doc, docs)
             for doc_id, parallel_doc in parallel_docs.items()
@@ -302,8 +333,10 @@ class ContextTranslationDatasetReader(DatasetReader):
                         try:
                             context_sent_index = self._context_pairs[doc_id][sent_id][0]
                         except:
-                            context_sent_index = -1
-                            print(doc_id, sent_id)
+                            logger.info(
+                                f"No indicator found for doc {doc_id} sent {sent_id}"
+                            )
+                            continue
                     # Oh, we have to find context sentences ourselves
                     else:
                         # Previous sentence in original document is used
@@ -384,7 +417,9 @@ class ContextTranslationDatasetReader(DatasetReader):
                             [
                                 p_id
                                 for p_id in range(sent_id - 1, -1, -1)
-                                if raw_documents[doc_id][self._source_lang][p_id]
+                                if raw_documents[doc_id][self._source_lang][
+                                    p_id
+                                ].strip()
                                 and p_id != context_sent_index
                             ]
                         )
@@ -444,7 +479,17 @@ class ContextTranslationDatasetReader(DatasetReader):
                         upbound = max(sent_id - self._window_size - 1, -1)
                     else:
                         upbound = -1
-                    index_range.update(set(range(sent_id - 1, upbound, -1)))
+                    index_range.update(
+                        set(
+                            [
+                                index
+                                for index in range(sent_id - 1, upbound, -1)
+                                if raw_documents[doc_id][self._source_lang][
+                                    index
+                                ].strip()
+                            ]
+                        )
+                    )
                     for index in index_range:
                         if (
                             self._translation_data_mode
