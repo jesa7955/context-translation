@@ -27,6 +27,8 @@ mecab-python3 = "*"
 fasttext = "*"
 pyknp = "*"
 ginza = "*"
+beautifulsoup4 = "*"
+lxml = "*"
 
 [requires]
 python_version = "3.7"
